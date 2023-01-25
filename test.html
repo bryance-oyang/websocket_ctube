@@ -1,0 +1,13 @@
+<html>
+	<head>
+		<script lang="javascript">
+			websocket = new WebSocket("ws://localhost:9999");
+			websocket.onmessage = (event) => {
+				document.getElementById("theit").innerHTML = event.data;
+			}
+		</script>
+	</head>
+	<body>
+		<div id="theit"></div>
+	</body>
+</html>
