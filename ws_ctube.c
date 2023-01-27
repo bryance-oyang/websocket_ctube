@@ -1,7 +1,85 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <stdlib.h>
+#include <string.h>
 #include "ws_ctube.h"
+
+struct conn_list {
+	int *conns;
+	int len;
+	int size;
+	pthread_mutex_t mutex;
+};
+
+static void conn_list_init(struct conn_list *conn_list)
+{
+	conn_list->len = 0;
+	conn_list->size = 1;
+	conn_list->conns = malloc(conn_list->size * sizeof(*conn_list->conns));
+	pthread_mutex_init(&conn_list->mutex);
+}
+
+static void conn_list_destroy(struct conn_list *conn_list)
+{
+	free(conn_list->conns);
+	pthread_mutex_destroy(&conn_list->mutex);
+}
+
+static void conn_list_add(struct conn_list *conn_list, int conn)
+{
+	pthread_mutex_lock(&conn_list->mutex);
+	if (conn_list->len >= conn_list->size) {
+		if (conn_list->size == 0) {
+			conn_list->size = 1;
+		} else {
+			conn_list->size *= 2;
+		}
+		conn_list->conns = realloc(conn_list->conns, conn_list->size);
+	}
+	conn_list->len++;
+	conn_list->conns[conn_list->len - 1] = conn;
+	pthread_mutex_unlock(&conn_list->mutex);
+}
+
+static void conn_list_remove(struct conn_list *conn_list, int conn)
+{
+	pthread_mutex_lock(&conn_list->mutex);
+	int i;
+	int orig_len = conn_list->len;
+	for (i = 0; i < orig_len; i++) {
+		if (conn_list->conns[i] == conn)
+			break;
+	}
+	if (i == orig_len) {
+		/* not found in list */
+		goto out;
+	} else if (i < orig_len - 1) {
+		memmove(&conn_list->conns[i], &conn_list->conns[i + 1], (orig_len - i - 1) * sizeof(*conn_list->conns));
+	}
+
+	conn_list->len--;
+	int tmp = conn_list->size / 2;
+	if (conn_list->len <= tmp) {
+		conn_list->size = tmp;
+		conn_list->conns = realloc(conn_list->conns, conn_list->size);
+	}
+out:
+	pthread_mutex_unlock(&conn_list->mutex);
+}
+
+struct conn_handler_td {
+
+};
+
+static void *ws_ctube_conn_handler(void *arg)
+{
+
+}
+
+static int ws_ctube_conn_handler_init(struct ws_ctube *ctube)
+{
+	return 0;
+}
 
 struct serv_td {
 	int port;
@@ -10,31 +88,6 @@ struct serv_td {
 	int thread_status;
 	pthread_barrier_t thread_ready;
 };
-
-struct conn_td {
-	int conn;
-	struct ws_ctube *ctube;
-	pthread_barrier_t thread_ready;
-};
-
-static void *ws_ctube_conn(void *arg)
-{
-
-}
-
-static void ws_ctube_conn_init(struct ws_ctube *ctube, int conn)
-{
-	struct conn_td conn_td;
-
-	conn_td.conn = conn;
-	conn_td.ctube = ctube;
-	pthread_barrier_init(&conn_td.thread_ready, NULL, 2);
-
-	pthread_create(&ctube->_conn_tid, NULL,
-
-	pthread_barrier_wait(&conn_td.thread_ready);
-	pthread_barrier_destroy(&conn_td.thread_ready);
-}
 
 static void *ws_ctube_serv_init(void *arg)
 {
@@ -66,12 +119,18 @@ static void *ws_ctube_serv_init(void *arg)
 		goto out_err;
 	}
 
+	/* client handler */
+	struct conn_list conn_list;
+	conn_list_init(&conn_list);
+	if (ws_ctube_conn_handler_init(ctube, &conn_list) != 0) {
+		goto out_err;
+	}
+
 success:
 	*thread_status = 0;
 	pthread_barrier_wait(thread_ready);
 	for (;;) {
 		int conn = accept(serv_sock, NULL, NULL);
-		ws_ctube_conn_init(ws_ctube, conn);
 	}
 	close(serv_sock);
 	return NULL;
@@ -123,7 +182,7 @@ void ws_ctube_unlock(struct ws_ctube *ctube)
 	pthread_mutex_unlock(&ctube->_mutex);
 }
 
-void ws_ctube_signal(struct ws_ctube *ctube)
+void ws_ctube_broadcast(struct ws_ctube *ctube)
 {
 	ws_ctube_lock(ctube);
 	ctube->_data_ready = 1;
