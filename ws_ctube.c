@@ -6,9 +6,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include "ws_ctube.h"
 
-#define BUFLEN 4096
+#include "ws_ctube.h"
+#include "ws_base.h"
+
+#define WS_CTUBE_BUFLEN 4096
 typedef int new_conn_t;
 
 struct conn_handler_td {
@@ -44,9 +46,18 @@ static int poll_write(struct pollfd *const fds, nfds_t nfds)
 
 static void handle_data_ready(struct ws_ctube *restrict ctube, struct pollfd *restrict fds, nfds_t nfds)
 {
+	/* clear pipe buffer */
+	char buf;
+	read(ctube->_data_ready_pipefd[0], &buf, 1);
+
 	poll_write(fds, nfds);
 
 	ws_ctube_lock(ctube);
+	for (nfds_t i = 2; i < nfds; i++) {
+		if (fds->revents & POLLOUT) {
+			ws_send(fds->fd, ctube->data, ctube->data_size);
+		}
+	}
 	ws_ctube_unlock(ctube);
 }
 
@@ -107,8 +118,8 @@ static void *conn_handler_main(void *arg)
 	}
 	pollfds_init(fds, ctube->_data_ready_pipefd[0], serv_pipefd);
 
-	char buf[BUFLEN];
-	if (BUFLEN < sizeof(new_conn_t)) {
+	char buf[WS_CTUBE_BUFLEN];
+	if (WS_CTUBE_BUFLEN < sizeof(new_conn_t)) {
 		fprintf(stderr, "conn_handler_main(): buf too small");
 		fflush(stderr);
 		raise(SIGSEGV);
@@ -237,7 +248,7 @@ static void *serv_main(void *arg)
 
 	/* serve forever */
 	new_conn_t conn;
-	char buf[BUFLEN];
+	char buf[WS_CTUBE_BUFLEN];
 	for (;;) {
 		/* new connection fd are written through the pipe to connection
 		 * handler thread */
