@@ -151,11 +151,11 @@ int ws_handshake(int conn)
 	client_key = ws_client_key(rbuf);
 	ws_server_response_key(server_key, client_key);
 
-	snprintf(response, WS_BUFLEN,
-		 "HTTP/1.1 101 Switching Protocols\r\n"
-		 "Upgrade: websocket\r\n"
-		 "Connection: Upgrade\r\n"
-		 "Sec-WebSocket-Accept: %s\r\n\r\n",
+	const char *const response_fmt = "HTTP/1.1 101 Switching Protocols\r\n"
+				"Upgrade: websocket\r\n"
+				"Connection: Upgrade\r\n"
+				"Sec-WebSocket-Accept: %s\r\n\r\n";
+	snprintf(response, WS_BUFLEN - strlen(response_fmt), response_fmt,
 		 server_key);
 	if (WS_DEBUG) {
 		printf("server response\n%s\n", response);

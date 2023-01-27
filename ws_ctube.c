@@ -16,43 +16,47 @@ struct conn_handler_td {
 	int serv_pipefd;
 };
 
-static void pollfds_init(struct pollfd *fds, int data_ready_pipefd, int serv_pipefd)
+static void pollfds_init(struct pollfd *const fds, int data_ready_pipefd, int serv_pipefd)
 {
 	fds[0].fd = data_ready_pipefd;
 	fds[1].fd = serv_pipefd;
 }
 
 /** poll all for reading */
-static int poll_read(struct pollfd *fds, int nfds)
+static int poll_read(struct pollfd *const fds, nfds_t nfds)
 {
-	for (int i = 0; i < nfds; i++) {
+	for (nfds_t i = 0; i < nfds; i++) {
 		fds[i].events = POLLIN;
 	}
 	return poll(fds, nfds, -1);
 }
 
 /** poll the non-pipe connections for writing */
-static int poll_write(struct pollfd *fds, int nfds)
+static int poll_write(struct pollfd *const fds, nfds_t nfds)
 {
 	fds[0].events = 0;
 	fds[1].events = 0;
-	for (int i = 2; i < nfds; i++) {
+	for (nfds_t i = 2; i < nfds; i++) {
 		fds[i].events = POLLOUT;
 	}
 	return poll(fds, nfds, -1);
 }
 
-static void handle_data_ready(struct ws_ctube *restrict ctube, struct pollfd *restrict fds, int nfds)
+static void handle_data_ready(struct ws_ctube *restrict ctube, struct pollfd *restrict fds, nfds_t nfds)
 {
+	poll_write(fds, nfds);
 
+	ws_ctube_lock(ctube);
+	ws_ctube_unlock(ctube);
 }
 
 static void handle_income(int conn)
 {
-
+	/* TODO: ping response */
+	return;
 }
 
-static void handle_new_conn(struct pollfd *restrict *restrict fds, int *restrict nfds, char *buf)
+static void handle_new_conn(struct pollfd *restrict *restrict const fds, nfds_t *restrict const nfds, char *const buf)
 {
 	int nread;
 	int ntoread = sizeof(new_conn_t);
@@ -75,17 +79,17 @@ static void handle_new_conn(struct pollfd *restrict *restrict fds, int *restrict
 	new_conn_t conn;
 	memcpy(&conn, buf, sizeof(new_conn_t));
 
-	*nfds++;
+	(*nfds)++;
 	*fds = realloc(*fds, *nfds * sizeof(**fds));
 	(*fds)[*nfds - 1].fd = conn;
 }
 
-static void handle_bad_conn(struct pollfd *restrict fds, int *restrict nfds, int i)
+static void handle_bad_conn(struct pollfd *restrict const fds, nfds_t *restrict const nfds, nfds_t i)
 {
 	if (i < *nfds - 1) {
 		memmove(&fds[i], &fds[i + 1], (*nfds - i - 1) * sizeof(*fds));
 	}
-	*nfds--;
+	(*nfds)--;
 }
 
 /** main for connection handler */
@@ -101,7 +105,7 @@ static void *conn_handler_main(void *arg)
 	if (fds == NULL) {
 		goto out_no_fds;
 	}
-	pollfds_init(fds);
+	pollfds_init(fds, ctube->_data_ready_pipefd[0], serv_pipefd);
 
 	char buf[BUFLEN];
 	if (BUFLEN < sizeof(new_conn_t)) {
@@ -123,7 +127,7 @@ static void *conn_handler_main(void *arg)
 		}
 
 		/* connections */
-		for (int i = 2; i < nfds; i++) {
+		for (nfds_t i = 2; i < nfds; i++) {
 			if (fds[i].revents == 0) {
 				continue;
 			}
@@ -299,10 +303,8 @@ void ws_ctube_unlock(struct ws_ctube *ctube)
 
 void ws_ctube_broadcast(struct ws_ctube *ctube)
 {
-	ws_ctube_lock(ctube);
-	ctube->_data_ready = 1;
-	pthread_cond_broadcast(&ctube->_data_ready_cond);
-	ws_ctube_unlock(ctube);
+	char buf = '\0';
+	write(ctube->_data_ready_pipefd[1], &buf, 1);
 }
 
 void ws_ctube_destroy(struct ws_ctube *ctube)
