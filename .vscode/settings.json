@@ -36,6 +36,10 @@
         "ratio": "c",
         "typeindex": "c",
         "typeinfo": "c",
-        "valarray": "c"
+        "valarray": "c",
+        "unordered_map": "c",
+        "unordered_set": "c",
+        "algorithm": "c",
+        "sstream": "c"
     }
 }

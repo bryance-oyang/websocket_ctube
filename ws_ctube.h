@@ -8,7 +8,8 @@ struct ws_ctube {
 	size_t data_size;
 
 	pthread_mutex_t _mutex;
-	int _data_ready_pipefd[2];
+	int _data_ready;
+	pthread_cond_t _data_ready_cond;
 
 	pthread_t _serv_tid;
 	pthread_t _conn_tid;

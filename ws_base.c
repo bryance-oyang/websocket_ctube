@@ -14,7 +14,7 @@
 static int send_all(int fd, char *buf, size_t len)
 {
 	while (len > 0) {
-		int nsent = send(fd, buf, len, 0);
+		int nsent = send(fd, buf, len, MSG_NOSIGNAL);
 		if (nsent < 1) {
 			return -1;
 		}
@@ -63,26 +63,26 @@ static void ws_print_frame(char *prefix, char *frame, int len)
 
 int ws_send(int conn, char *msg, int msg_size)
 {
-	int payld_len;
+	int payld_size;
 	const int payld_offset = 2;
 	int frame_len;
 	char frame[WS_BUFLEN];
 
 	for (int first = 1; msg_size > 0;
-	     msg_size -= payld_len, msg += payld_len, first = 0) {
+	     msg_size -= payld_size, msg += payld_size, first = 0) {
 		memset(frame, 0, 128);
 
 		if (msg_size > 125) {
 			frame[0] = first;
-			payld_len = 125;
+			payld_size = 125;
 		} else {
 			frame[0] = 0b10000000 + first;
-			payld_len = msg_size;
+			payld_size = msg_size;
 		}
-		frame[1] = payld_len;
+		frame[1] = payld_size;
 
-		frame_len = payld_offset + payld_len;
-		strncpy(&frame[payld_offset], msg, WS_BUFLEN - payld_offset);
+		frame_len = payld_offset + payld_size;
+		memcpy(&frame[payld_offset], msg, payld_size);
 		ws_print_frame("ws_send", frame, frame_len);
 
 		if (send_all(conn, frame, frame_len) != 0)

@@ -13,6 +13,67 @@
 #define WS_CTUBE_BUFLEN 4096
 typedef int new_conn_t;
 
+struct poll_list {
+	struct pollfd *fds;
+	nfds_t nfds;
+	nfds_t cap;
+	pthread_mutex_t mutex;
+};
+
+static void poll_list_init(struct poll_list *pl)
+{
+	pl->fds = NULL;
+	pl->nfds = 0;
+	pl->cap = 0;
+	pthread_mutex_init(&pl->mutex, NULL);
+}
+
+static void poll_list_destroy(struct poll_list *pl)
+{
+	free(pl->fds);
+	pthread_mutex_destroy(&pl->mutex);
+}
+
+static void poll_list_add(struct poll_list *restrict pl, int fd)
+{
+	pthread_mutex_lock(&pl->mutex);
+	if (pl->nfds == pl->cap) {
+		pl->cap = pl->cap * 2 + 1;
+		pl->fds = realloc(pl->fds, pl->cap * sizeof(*pl->fds));
+	}
+
+	pl->fds[pl->nfds].fd = fd;
+	pl->nfds++;
+	pthread_mutex_unlock(&pl->mutex);
+}
+
+static void poll_list_remove(struct poll_list *restrict pl, int fd)
+{
+	pthread_mutex_lock(&pl->mutex);
+	nfds_t i;
+	for (i = 0; i < pl->nfds; i++) {
+		if (fd == pl->fds[i].fd) {
+			break;
+		}
+	}
+	if (i == pl->nfds) {
+		return;
+	}
+
+	if (i < pl->nfds - 1) {
+		memmove(&pl->fds[i], &pl->fds[i + 1], (pl->nfds - i - 1) * sizeof(*pl->fds));
+	}
+	pl->nfds--;
+
+	nfds_t half_cap = pl->cap / 2;
+	if (pl->nfds < half_cap) {
+		pl->cap = half_cap;
+		pl->fds = realloc(pl->fds, pl->cap * sizeof(*pl->fds));
+	}
+
+	pthread_mutex_unlock(&pl->mutex);
+}
+
 struct conn_handler_td {
 	struct ws_ctube *ctube;
 	int serv_pipefd;
@@ -275,7 +336,9 @@ static int syncprim_init(struct ws_ctube *ctube)
 	pthread_mutex_init(&ctube->_mutex, &attr);
 	pthread_mutexattr_destroy(&attr);
 
-	return pipe(ctube->_data_ready_pipefd);
+	pthread_cond_init(&ctube->_data_ready_cond);
+
+	return 0;
 }
 
 int ws_ctube_init(struct ws_ctube *ctube, int port)
@@ -314,8 +377,10 @@ void ws_ctube_unlock(struct ws_ctube *ctube)
 
 void ws_ctube_broadcast(struct ws_ctube *ctube)
 {
-	char buf = '\0';
-	write(ctube->_data_ready_pipefd[1], &buf, 1);
+	ws_ctube_lock(ctube);
+	ctube->_data_ready = 1;
+	pthread_cond_broadcast(&ctube->_data_ready_cond);
+	ws_ctube_unlock(ctube);
 }
 
 void ws_ctube_destroy(struct ws_ctube *ctube)
@@ -326,7 +391,5 @@ void ws_ctube_destroy(struct ws_ctube *ctube)
 	pthread_join(ctube->_conn_tid, NULL);
 
 	pthread_mutex_destroy(&ctube->_mutex);
-
-	close(ctube->_data_ready_pipefd[0]);
-	close(ctube->_data_ready_pipefd[1]);
+	pthread_cond_destroy(&ctube->_data_ready_cond);
 }
