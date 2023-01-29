@@ -61,7 +61,7 @@ static void ws_print_frame(char *prefix, char *frame, int len)
 	fflush(stdout);
 }
 
-int ws_send(int conn, char *msg, int msg_size)
+int ws_send(int conn, const char *msg, int msg_size)
 {
 	int payld_size;
 	const int payld_offset = 2;
@@ -92,8 +92,27 @@ int ws_send(int conn, char *msg, int msg_size)
 	return 0;
 }
 
-int ws_recv(int conn, char *msg, int msg_size)
+int ws_recv(int conn, char *msg, int *msg_size, int max_msg_size)
 {
+	(void)conn;
+	(void)msg;
+	(void)msg_size;
+	(void)max_msg_size;
+	return 0;
+}
+
+int ws_is_ping(const char *msg, int msg_size)
+{
+	(void)msg;
+	(void)msg_size;
+	return 0;
+}
+
+int ws_pong(int conn, const char *msg, int msg_size)
+{
+	(void)conn;
+	(void)msg;
+	(void)msg_size;
 	return 0;
 }
 

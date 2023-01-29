@@ -9,124 +9,155 @@
 
 #include "ws_ctube.h"
 #include "ws_base.h"
+#include "poll_list.h"
 
 #define WS_CTUBE_BUFLEN 4096
 
-struct poll_list {
-	int *fds;
-	nfds_t nfds;
-	nfds_t cap;
-	pthread_mutex_t mutex;
+struct handler_main_arg {
+	struct ws_ctube *ctube;
+	struct poll_list *pl;
+	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds);
+	pthread_barrier_t *handlers_ready;
 };
 
-static void poll_list_init(struct poll_list *pl)
+static int poll_events(struct pollfd *restrict fds, nfds_t nfds, short events)
 {
-	pl->fds = NULL;
-	pl->nfds = 0;
-	pl->cap = 0;
-	pthread_mutex_init(&pl->mutex, NULL);
+	for (nfds_t i = 0; i < nfds; i++) {
+		fds[i].events = events;
+	}
+	return poll(fds, nfds, -1);
 }
 
-static void poll_list_destroy(struct poll_list *pl)
+static int conn_reader(struct ws_ctube *ctube, struct pollfd *restrict fds, nfds_t nfds)
 {
-	free(pl->fds);
-	pthread_mutex_destroy(&pl->mutex);
-}
+	(void)ctube;
 
-static void poll_list_add(struct poll_list *restrict pl, int fd)
-{
-	pthread_mutex_lock(&pl->mutex);
-	if (pl->nfds == pl->cap) {
-		pl->cap = pl->cap * 2 + 1;
-		pl->fds = realloc(pl->fds, pl->cap * sizeof(*pl->fds));
+	if (poll_events(fds, nfds, POLLIN) < 0) {
+		return -1;
 	}
 
-	pl->fds[pl->nfds] = fd;
-	pl->nfds++;
-	pthread_mutex_unlock(&pl->mutex);
-}
+	char msg[WS_CTUBE_BUFLEN];
+	int msg_size;
+	for (nfds_t i = 0; i < nfds; i++) {
+		if (!(fds[i].revents & POLLIN)) {
+			continue;
+		}
 
-static void poll_list_remove(struct poll_list *restrict pl, int fd)
-{
-	pthread_mutex_lock(&pl->mutex);
-	nfds_t i;
-	for (i = 0; i < pl->nfds; i++) {
-		if (fd == pl->fds[i]) {
-			break;
+		ws_recv(fds[i].fd, msg, &msg_size, WS_CTUBE_BUFLEN);
+		if (ws_is_ping(msg, msg_size)) {
+			ws_pong(fds[i].fd, msg, msg_size);
 		}
 	}
-	if (i == pl->nfds) {
-		return;
-	}
 
-	if (i < pl->nfds - 1) {
-		memmove(&pl->fds[i], &pl->fds[i + 1], (pl->nfds - i - 1) * sizeof(*pl->fds));
-	}
-	pl->nfds--;
-
-	nfds_t half_cap = pl->cap / 2;
-	if (pl->nfds < half_cap) {
-		pl->cap = half_cap;
-		pl->fds = realloc(pl->fds, pl->cap * sizeof(*pl->fds));
-	}
-	pthread_mutex_unlock(&pl->mutex);
+	return 0;
 }
 
-static struct pollfd *poll_list_alloc_cpy(const struct poll_list *restrict pl)
-{
-	pthread_mutex_lock(&pl->mutex);
-	struct pollfd *fds = malloc(pl->nfds * sizeof(*fds));
-	if (fds == NULL) {
-		fprintf(stderr, "poll_list_cpy(): out of memory\n");
-		fflush(stderr);
-		return NULL;
-	}
-	for (nfds_t i = 0; i < pl->nfds; i++) {
-		fds[i].fd = pl->fds[i];
-	}
-	pthread_mutex_unlock(&pl->mutex);
-	return fds;
-}
-
-struct conn_handler_td {
-	struct ws_ctube *ctube;
-	int serv_pipefd;
+struct conn_writer_cleanup_arg {
+	char *out_buf;
 };
 
-static void handle_data_ready(struct ws_ctube *restrict ctube, struct pollfd *restrict fds, nfds_t nfds)
+static void conn_writer_cleanup(void *arg)
 {
+	char *out_buf = ((struct conn_writer_cleanup_arg *)arg)->out_buf;
+	free(out_buf);
 }
 
-static void handle_income(int conn)
+static int conn_writer(struct ws_ctube *restrict ctube, struct pollfd *restrict fds, nfds_t nfds)
 {
-	/* TODO: ping response */
-	return;
-}
+	int retval = 0;
+	char *out_buf = NULL;
+	size_t out_buf_size;
 
-static void handle_new_conn(struct pollfd *restrict *restrict const fds, nfds_t *restrict const nfds, char *const buf)
-{
-}
+	/* wait and copy data into sending buffer */
+	ws_ctube_lock(ctube);
+	while (!ctube->_data_ready) {
+		pthread_cond_wait(&ctube->_data_ready_cond, &ctube->_mutex);
+	}
+	out_buf_size = ctube->data_size;
+	out_buf = malloc(out_buf_size * sizeof(*out_buf));
+	if (out_buf == NULL) {
+		ws_ctube_unlock(ctube);
+		retval = -1;
+		goto out_nodata;
+	}
+	memcpy(out_buf, ctube->data, out_buf_size);
+	ws_ctube_unlock(ctube);
 
-static void handle_bad_conn(struct pollfd *restrict const fds, nfds_t *restrict const nfds, nfds_t i)
-{
-}
-
-/** main for connection handler */
-static void *conn_handler_main(void *arg)
-{
-	struct ws_ctube *ctube = ((struct conn_handler_td *)arg)->ctube;
-	int serv_pipefd = ((struct conn_handler_td *)arg)->serv_pipefd;
-
-	return NULL;
-}
-
-static int conn_handler_init(struct ws_ctube *ctube, int serv_pipefd)
-{
-	struct conn_handler_td td = {
-		.ctube = ctube,
-		.serv_pipefd = serv_pipefd
+	struct conn_writer_cleanup_arg cleanup_arg = {
+		.out_buf = out_buf
 	};
-	return pthread_create(&ctube->_conn_tid, NULL, conn_handler_main, (void *)&td);
+	pthread_cleanup_push(conn_writer_cleanup, (void *)&cleanup_arg);
+
+	if (poll_events(fds, nfds, POLLOUT) < 0) {
+		retval = -1;
+		goto out;
+	}
+
+	for (nfds_t i = 0; i < nfds; i++) {
+		if (!(fds[i].revents & POLLOUT)) {
+			continue;
+		}
+
+		ws_send(fds[i].fd, out_buf, out_buf_size);
+	}
+
+	pthread_cleanup_pop(0);
+out:
+	free(out_buf);
+out_nodata:
+	return retval;
+}
+
+static int prune_bad_conn(struct pollfd *restrict fds, struct poll_list *restrict pl)
+{
+	int retval = 0;
+	pthread_mutex_lock(&pl->mutex);
+	for (nfds_t i = 0; i < pl->nfds; i++) {
+		if (fds[i].revents & POLLERR || fds[i].revents & POLLHUP || fds[i].revents & POLLNVAL) {
+			if (poll_list_remove(pl, fds[i].fd) == PL_ENOMEM) {
+				retval = -1;
+				break;
+			}
+		}
+	}
+	pthread_mutex_unlock(&pl->mutex);
+	return retval;
+}
+
+static void *handler_main(void *arg)
+{
+	struct ws_ctube *ctube = ((struct handler_main_arg *)arg)->ctube;
+	struct poll_list *pl = ((struct handler_main_arg *)arg)->pl;
+	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds) = ((struct handler_main_arg *)arg)->handler_action;
+	pthread_barrier_t *handlers_ready = ((struct handler_main_arg *)arg)->handlers_ready;
+	pthread_barrier_wait(handlers_ready);
+
+	struct pollfd *fds = NULL;
+	for (;;) {
+		fds = poll_list_alloc_cpy(pl);
+		if (fds == NULL) {
+			goto out_err;
+		}
+
+		if (handler_action(ctube, fds, pl->nfds) != 0) {
+			goto out_err;
+		}
+
+		if (prune_bad_conn(fds, pl) != 0) {
+			goto out_err;
+		}
+
+		free(fds);
+		fds = NULL;
+	}
+
+out_err:
+	if (fds != NULL) {
+		free(fds);
+	}
+	fprintf(stderr, "handler_main(): error\n");
+	fflush(stderr);
+	return NULL;
 }
 
 static int bind_serv(int serv_sock, int port) {
@@ -137,11 +168,59 @@ static int bind_serv(int serv_sock, int port) {
 	return bind(serv_sock, (struct sockaddr *)&sa, sizeof(sa));
 }
 
-static void serve_forever(int serv_sock)
+static int serv_spawn_handlers(struct ws_ctube *ctube, struct poll_list *pl, pthread_t *reader_tid, pthread_t *writer_tid)
+{
+	pthread_barrier_t handlers_ready;
+	pthread_barrier_init(&handlers_ready, NULL, 3);
+
+	struct handler_main_arg reader_arg = {
+		.ctube = ctube,
+		.pl = pl,
+		.handler_action = conn_reader,
+		.handlers_ready = &handlers_ready
+	};
+	if (pthread_create(reader_tid, NULL, handler_main, (void *)&reader_arg) != 0) {
+		goto out_noreader;
+	}
+
+	struct handler_main_arg writer_arg = {
+		.ctube = ctube,
+		.pl = pl,
+		.handler_action = conn_writer,
+		.handlers_ready = &handlers_ready
+	};
+	if (pthread_create(writer_tid, NULL, handler_main, (void *)&writer_arg) != 0) {
+		goto out_nowriter;
+	}
+
+	pthread_barrier_wait(&handlers_ready);
+	pthread_barrier_destroy(&handlers_ready);
+	return 0;
+
+out_nowriter:
+	pthread_cancel(*reader_tid);
+	pthread_join(*reader_tid, NULL);
+out_noreader:
+	pthread_barrier_destroy(&handlers_ready);
+	fprintf(stderr, "serv_spawn_handlers(): failed\n");
+	fflush(stderr);
+	return -1;
+}
+
+static void serv_forever(int serv_sock, struct poll_list *pl)
 {
 	for (;;) {
 		int conn = accept(serv_sock, NULL, NULL);
+		int r = poll_list_add(pl, conn);
+		if (r == PL_ENOMEM) {
+			goto out_err;
+		}
 	}
+
+out_err:
+	fprintf(stderr, "serv_forever(): error\n");
+	int r = -1;
+	pthread_exit(&r);
 }
 
 struct serv_main_arg {
@@ -154,13 +233,24 @@ struct serv_main_arg {
 
 struct serv_cleanup_arg {
 	int serv_sock;
+	pthread_t reader_tid;
+	pthread_t writer_tid;
+	struct poll_list *pl;
 };
 
-static void *serv_cleanup(void *arg)
+static void serv_cleanup(void *arg)
 {
 	int serv_sock = ((struct serv_cleanup_arg *)arg)->serv_sock;
+	pthread_t reader_tid = ((struct serv_cleanup_arg *)arg)->reader_tid;
+	pthread_t writer_tid = ((struct serv_cleanup_arg *)arg)->writer_tid;
+	struct poll_list *pl = ((struct serv_cleanup_arg *)arg)->pl;
+
+	poll_list_destroy(pl);
+	pthread_cancel(writer_tid);
+	pthread_cancel(reader_tid);
+	pthread_join(writer_tid, NULL);
+	pthread_join(reader_tid, NULL);
 	close(serv_sock);
-	return NULL;
 }
 
 /** main for server */
@@ -196,16 +286,27 @@ static void *serv_main(void *arg)
 		goto out_err;
 	}
 
+	struct poll_list pl;
+	poll_list_init(&pl);
+
+	/* spawn reader and writer */
+	pthread_t reader_tid, writer_tid;
+	if (serv_spawn_handlers(ctube, &pl, &reader_tid, &writer_tid) != 0) {
+		goto out_err;
+	}
+
 	/* success */
 	*serv_stat = 0;
 	struct serv_cleanup_arg serv_cleanup_arg = {
-		.serv_sock = serv_sock
+		.serv_sock = serv_sock,
+		.reader_tid = reader_tid,
+		.writer_tid = writer_tid,
+		.pl = &pl
 	};
 	pthread_cleanup_push(serv_cleanup, (void *)&serv_cleanup_arg);
 	pthread_barrier_wait(server_ready);
-	serv_forever();
+	serv_forever(serv_sock, &pl);
 	pthread_cleanup_pop(0);
-	pthread_exit(0); // not necessary but just for aesthetics: thread exits only by being cancelled
 
 	/* code doesn't get here unless error */
 out_err:
@@ -273,9 +374,7 @@ void ws_ctube_broadcast(struct ws_ctube *ctube)
 void ws_ctube_destroy(struct ws_ctube *ctube)
 {
 	pthread_cancel(ctube->_serv_tid);
-	pthread_cancel(ctube->_conn_tid);
 	pthread_join(ctube->_serv_tid, NULL);
-	pthread_join(ctube->_conn_tid, NULL);
 
 	pthread_mutex_destroy(&ctube->_mutex);
 	pthread_cond_destroy(&ctube->_data_ready_cond);
