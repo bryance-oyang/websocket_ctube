@@ -10,8 +10,9 @@ PFLAGS=-ggdb3
 DFLAGS=$(CFLAGS) -MM -MT
 
 # debug and sanitize code
-CWS_DEBUG=-ggdb3 -fno-omit-frame-pointer -fno-common -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=leak -fsanitize=undefined -fsanitize-address-use-after-scope
-TWS_DEBUG=-ggdb3 -fsanitize=thread
+CDEBUG=-ggdb3
+SANITIZE=-ggdb3 -fno-omit-frame-pointer -fno-common -fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract -fsanitize=leak -fsanitize=undefined -fsanitize-address-use-after-scope
+TSANITIZE=-ggdb3 -fsanitize=thread
 
 # env vars for sanitizers
 # https://github.com/google/sanitizers/wiki/SanitizerCommonFlags
@@ -20,7 +21,7 @@ TWS_DEBUG=-ggdb3 -fsanitize=thread
 # export ASAN_OPTIONS=check_initialization_order=true:detect_stack_use_after_return=true:print_stats=true:atexit=true
 
 # Fix false memory leak reporting when using glib2
-#export G_SLICE=always-malloc G_WS_DEBUG=gc-friendly
+#export G_SLICE=always-malloc G_DEBUG=gc-friendly
 
 ifdef srcdir
 VPATH=$(srcdir)
@@ -36,11 +37,14 @@ DEPS=$(SRCS:.c=.d)
 ASMS=$(SRCS:.c=.s)
 
 ifeq ($(MAKECMDGOALS), debug)
-CFLAGS+=$(CWS_DEBUG)
-LDFLAGS+=$(CWS_DEBUG)
-else ifeq ($(MAKECMDGOALS), thread)
-CFLAGS+=$(TWS_DEBUG)
-LDFLAGS+=$(TWS_DEBUG)
+CFLAGS+=$(CDEBUG)
+LDFLAGS+=$(CDEBUG)
+else ifeq ($(MAKECMDGOALS), sanitize)
+CFLAGS+=$(SANITIZE)
+LDFLAGS+=$(SANITIZE)
+else ifeq ($(MAKECMDGOALS), tsanitize)
+CFLAGS+=$(TSANITIZE)
+LDFLAGS+=$(TSANITIZE)
 else ifeq ($(MAKECMDGOALS), profile)
 CFLAGS+=$(OFLAGS) $(PFLAGS)
 LDFLAGS+=$(OFLAGS) $(PFLAGS)
@@ -71,8 +75,12 @@ profile: $(DEPS) $(EXEC)
 debug: $(DEPS) $(EXEC)
 	@echo done
 
-.PHONY: thread
-thread: $(DEPS) $(EXEC)
+.PHONY: sanitize
+sanitize: $(DEPS) $(EXEC)
+	@echo done
+
+.PHONY: tsanitize
+tsanitize: $(DEPS) $(EXEC)
 	@echo done
 
 .PHONY: asm
