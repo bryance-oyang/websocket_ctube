@@ -36,7 +36,7 @@ static void poll_list_destroy(struct poll_list *pl)
 	pthread_mutex_destroy(&pl->mutex);
 }
 
-static int poll_list_add(struct poll_list *restrict pl, int fd)
+static int poll_list_add(struct poll_list *pl, int fd)
 {
 	pthread_mutex_lock(&pl->mutex);
 	/* 0th is reserved for pipe */
@@ -62,7 +62,7 @@ static int poll_list_add(struct poll_list *restrict pl, int fd)
 	return 0;
 }
 
-static int poll_list_remove(struct poll_list *restrict pl, int fd)
+static int poll_list_remove(struct poll_list *pl, int fd)
 {
 	pthread_mutex_lock(&pl->mutex);
 	nfds_t i;
@@ -94,38 +94,6 @@ static int poll_list_remove(struct poll_list *restrict pl, int fd)
 	}
 	pthread_mutex_unlock(&pl->mutex);
 	return 0;
-}
-
-static void poll_list_alloc_cpy(struct poll_list *restrict pl, struct pollfd **fds, int *nfds, int **handshake_complete)
-{
-	pthread_mutex_lock(&pl->mutex);
-	*nfds = pl->nfds;
-
-	*fds = malloc(pl->nfds * sizeof(**fds));
-	if (*fds == NULL) {
-		goto out_nofds;
-	}
-
-	*handshake_complete = malloc(pl->nfds * sizeof(**handshake_complete));
-	if (*handshake_complete == NULL) {
-		goto out_nohs;
-	}
-
-	for (nfds_t i = 0; i < pl->nfds; i++) {
-		(*fds)[i].fd = pl->fds[i];
-		(*handshake_complete)[i] = pl->handshake_complete[i];
-	}
-	pthread_mutex_unlock(&pl->mutex);
-	return;
-
-out_nohs:
-	free(*fds);
-out_nofds:
-	*fds = NULL;
-	*handshake_complete = NULL;
-	fprintf(stderr, "poll_list_cpy(): out of memory\n");
-	fflush(stderr);
-	pthread_mutex_unlock(&pl->mutex);
 }
 
 #endif /* POLL_LIST_H */
