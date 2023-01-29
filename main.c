@@ -5,7 +5,7 @@
 int main()
 {
 	struct ws_ctube ctube;
-	ws_ctube_init(&ctube, 9999);
+	ws_ctube_init(&ctube, 9999, 10);
 
 	sleep(10);
 

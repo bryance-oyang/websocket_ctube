@@ -2,6 +2,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <poll.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,19 +14,23 @@
 
 #define WS_CTUBE_BUFLEN 4096
 
-struct handler_main_arg {
-	struct ws_ctube *ctube;
-	struct poll_list *pl;
-	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds);
-	pthread_barrier_t *handlers_ready;
-};
-
 static int poll_events(struct pollfd *restrict fds, nfds_t nfds, short events)
 {
-	for (nfds_t i = 0; i < nfds; i++) {
+	fds[0].events = POLLIN;
+
+	for (nfds_t i = 1; i < nfds; i++) {
 		fds[i].events = events;
 	}
+
 	return poll(fds, nfds, -1);
+}
+
+static void clear_serv_pipe(struct pollfd *restrict fds)
+{
+	char buf[WS_CTUBE_BUFLEN];
+	if (fds[0].revents & POLLIN) {
+		read(fds[0].fd, buf, WS_CTUBE_BUFLEN);
+	}
 }
 
 static int conn_reader(struct ws_ctube *ctube, struct pollfd *restrict fds, nfds_t nfds)
@@ -38,7 +43,7 @@ static int conn_reader(struct ws_ctube *ctube, struct pollfd *restrict fds, nfds
 
 	char msg[WS_CTUBE_BUFLEN];
 	int msg_size;
-	for (nfds_t i = 0; i < nfds; i++) {
+	for (nfds_t i = 1; i < nfds; i++) {
 		if (!(fds[i].revents & POLLIN)) {
 			continue;
 		}
@@ -93,7 +98,7 @@ static int conn_writer(struct ws_ctube *restrict ctube, struct pollfd *restrict 
 		goto out;
 	}
 
-	for (nfds_t i = 0; i < nfds; i++) {
+	for (nfds_t i = 1; i < nfds; i++) {
 		if (!(fds[i].revents & POLLOUT)) {
 			continue;
 		}
@@ -112,7 +117,7 @@ static int prune_bad_conn(struct pollfd *restrict fds, struct poll_list *restric
 {
 	int retval = 0;
 	pthread_mutex_lock(&pl->mutex);
-	for (nfds_t i = 0; i < pl->nfds; i++) {
+	for (nfds_t i = 1; i < pl->nfds; i++) {
 		if (fds[i].revents & POLLERR || fds[i].revents & POLLHUP || fds[i].revents & POLLNVAL) {
 			if (poll_list_remove(pl, fds[i].fd) == PL_ENOMEM) {
 				retval = -1;
@@ -123,6 +128,13 @@ static int prune_bad_conn(struct pollfd *restrict fds, struct poll_list *restric
 	pthread_mutex_unlock(&pl->mutex);
 	return retval;
 }
+
+struct handler_main_arg {
+	struct ws_ctube *ctube;
+	struct poll_list *pl;
+	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds);
+	pthread_barrier_t *handlers_ready;
+};
 
 static void *handler_main(void *arg)
 {
@@ -142,6 +154,8 @@ static void *handler_main(void *arg)
 		if (handler_action(ctube, fds, pl->nfds) != 0) {
 			goto out_err;
 		}
+
+		clear_serv_pipe(fds);
 
 		if (prune_bad_conn(fds, pl) != 0) {
 			goto out_err;
@@ -207,32 +221,28 @@ out_noreader:
 	return -1;
 }
 
-static void serv_forever(int serv_sock, struct poll_list *pl)
+static void serv_forever(int serv_sock, int serv_pipe, struct poll_list *pl)
 {
+	int conn, r;
+	char buf = 0;
 	for (;;) {
-		int conn = accept(serv_sock, NULL, NULL);
-		int r = poll_list_add(pl, conn);
+		conn = accept(serv_sock, NULL, NULL);
+		r = poll_list_add(pl, conn);
 		if (r == PL_ENOMEM) {
 			goto out_err;
 		}
+		write(serv_pipe, &buf, 1);
 	}
 
 out_err:
 	fprintf(stderr, "serv_forever(): error\n");
-	int r = -1;
-	pthread_exit(&r);
+	int retval = -1;
+	pthread_exit(&retval);
 }
-
-struct serv_main_arg {
-	int port;
-	struct ws_ctube *ctube;
-
-	int serv_stat;
-	pthread_barrier_t server_ready;
-};
 
 struct serv_cleanup_arg {
 	int serv_sock;
+	int *serv_pipe;
 	pthread_t reader_tid;
 	pthread_t writer_tid;
 	struct poll_list *pl;
@@ -241,28 +251,44 @@ struct serv_cleanup_arg {
 static void serv_cleanup(void *arg)
 {
 	int serv_sock = ((struct serv_cleanup_arg *)arg)->serv_sock;
+	int *serv_pipe = ((struct serv_cleanup_arg *)arg)->serv_pipe;
 	pthread_t reader_tid = ((struct serv_cleanup_arg *)arg)->reader_tid;
 	pthread_t writer_tid = ((struct serv_cleanup_arg *)arg)->writer_tid;
 	struct poll_list *pl = ((struct serv_cleanup_arg *)arg)->pl;
 
-	poll_list_destroy(pl);
 	pthread_cancel(writer_tid);
 	pthread_cancel(reader_tid);
 	pthread_join(writer_tid, NULL);
 	pthread_join(reader_tid, NULL);
+	poll_list_destroy(pl);
+	close(serv_pipe[0]);
+	close(serv_pipe[1]);
 	close(serv_sock);
 }
+
+struct serv_main_arg {
+	int port;
+	struct ws_ctube *ctube;
+	int conn_limit;
+
+	int serv_stat;
+	pthread_barrier_t server_ready;
+};
 
 /** main for server */
 static void *serv_main(void *arg)
 {
 	int port = ((struct serv_main_arg *)arg)->port;
 	struct ws_ctube *ctube = ((struct serv_main_arg *)arg)->ctube;
+	int conn_limit = ((struct serv_main_arg *)arg)->conn_limit;
 	int *serv_stat = &((struct serv_main_arg *)arg)->serv_stat;
 	pthread_barrier_t *server_ready = &((struct serv_main_arg *)arg)->server_ready;
 
+	int serv_pipe[2];
+	int serv_sock;
+
 	/* create server socket */
-	int serv_sock = socket(AF_INET, SOCK_STREAM, 0);
+	serv_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (serv_sock == -1) {
 		perror(NULL);
 		goto out_nosock;
@@ -271,45 +297,61 @@ static void *serv_main(void *arg)
 	if (setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &true,
 		   sizeof(int)) == -1) {
 		perror(NULL);
-		goto out_err;
+		goto out_nopipe;
 	}
 
 	/* set server socket address/port */
 	if (bind_serv(serv_sock, port) == -1) {
 		perror(NULL);
-		goto out_err;
+		goto out_nopipe;
 	}
 
 	/* set listening */
 	if (listen(serv_sock, 1) == -1) {
 		perror(NULL);
-		goto out_err;
+		goto out_nopipe;
 	}
 
+	/* create pipe to comm with handlers */
+	if (pipe(serv_pipe) == -1) {
+		perror(NULL);
+		goto out_nopipe;
+	}
+	fcntl(serv_pipe[0], F_SETFL, O_NONBLOCK);
+	fcntl(serv_pipe[1], F_SETFL, O_NONBLOCK);
+
+	/* add pipe to pipe_list */
 	struct poll_list pl;
-	poll_list_init(&pl);
+	poll_list_init(&pl, conn_limit);
+	if (poll_list_add(&pl, serv_pipe[0]) == -1) {
+		goto out_nohandlers;
+	}
 
 	/* spawn reader and writer */
 	pthread_t reader_tid, writer_tid;
 	if (serv_spawn_handlers(ctube, &pl, &reader_tid, &writer_tid) != 0) {
-		goto out_err;
+		goto out_nohandlers;
 	}
 
 	/* success */
 	*serv_stat = 0;
 	struct serv_cleanup_arg serv_cleanup_arg = {
 		.serv_sock = serv_sock,
+		.serv_pipe = serv_pipe,
 		.reader_tid = reader_tid,
 		.writer_tid = writer_tid,
 		.pl = &pl
 	};
 	pthread_cleanup_push(serv_cleanup, (void *)&serv_cleanup_arg);
 	pthread_barrier_wait(server_ready);
-	serv_forever(serv_sock, &pl);
+	serv_forever(serv_sock, serv_pipe[1], &pl);
 	pthread_cleanup_pop(0);
 
 	/* code doesn't get here unless error */
-out_err:
+out_nohandlers:
+	close(serv_pipe[0]);
+	close(serv_pipe[1]);
+out_nopipe:
 	close(serv_sock);
 out_nosock:
 	*serv_stat = -1;
@@ -329,7 +371,7 @@ static int syncprim_init(struct ws_ctube *ctube)
 	return 0;
 }
 
-int ws_ctube_init(struct ws_ctube *ctube, int port)
+int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit)
 {
 	if (syncprim_init(ctube) != 0) {
 		fprintf(stderr, "syncprim_init(): failed\n");
@@ -340,6 +382,7 @@ int ws_ctube_init(struct ws_ctube *ctube, int port)
 	struct serv_main_arg serv_main_arg;
 	serv_main_arg.port = port;
 	serv_main_arg.ctube = ctube;
+	serv_main_arg.conn_limit = conn_limit;
 	serv_main_arg.serv_stat = 0;
 	pthread_barrier_init(&serv_main_arg.server_ready, NULL, 2);
 

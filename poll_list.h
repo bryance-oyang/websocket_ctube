@@ -12,24 +12,29 @@ struct poll_list {
 	pthread_mutex_t mutex;
 };
 
-static void poll_list_init(struct poll_list *pl)
+static void poll_list_init(struct poll_list *pl, int conn_limit)
 {
 	pl->fds = NULL;
 	pl->nfds = 0;
 	pl->cap = 0;
+	pl->conn_limit = conn_limit;
 	pthread_mutex_init(&pl->mutex, NULL);
 }
 
 static void poll_list_destroy(struct poll_list *pl)
 {
-	free(pl->fds);
+	if (pl->fds != NULL) {
+		free(pl->fds);
+	}
+	pl->fds = NULL;
 	pthread_mutex_destroy(&pl->mutex);
 }
 
 static int poll_list_add(struct poll_list *restrict pl, int fd)
 {
 	pthread_mutex_lock(&pl->mutex);
-	if (pl->nfds == pl->conn_limit) {
+	/* 0th is reserved for pipe */
+	if (pl->nfds >= pl->conn_limit + 1) {
 		return PL_ECONNLIM;
 	}
 
