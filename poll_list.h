@@ -6,6 +6,7 @@
 
 struct poll_list {
 	int *fds;
+	int *handshake_complete;
 	nfds_t nfds;
 	nfds_t cap;
 	nfds_t conn_limit;
@@ -15,6 +16,7 @@ struct poll_list {
 static void poll_list_init(struct poll_list *pl, int conn_limit)
 {
 	pl->fds = NULL;
+	pl->handshake_complete = NULL;
 	pl->nfds = 0;
 	pl->cap = 0;
 	pl->conn_limit = conn_limit;
@@ -27,6 +29,10 @@ static void poll_list_destroy(struct poll_list *pl)
 		free(pl->fds);
 	}
 	pl->fds = NULL;
+	if (pl->handshake_complete != NULL) {
+		free(pl->handshake_complete);
+	}
+	pl->handshake_complete = NULL;
 	pthread_mutex_destroy(&pl->mutex);
 }
 
@@ -41,7 +47,8 @@ static int poll_list_add(struct poll_list *restrict pl, int fd)
 	if (pl->nfds == pl->cap) {
 		pl->cap = pl->cap * 2 + 1;
 		pl->fds = realloc(pl->fds, pl->cap * sizeof(*pl->fds));
-		if (pl->fds == NULL) {
+		pl->handshake_complete = realloc(pl->handshake_complete, pl->cap * sizeof(*pl->handshake_complete));
+		if (pl->fds == NULL || pl->handshake_complete == NULL) {
 			fprintf(stderr, "poll_list_add(): out of mem\n");
 			fflush(stderr);
 			return PL_ENOMEM;
@@ -49,6 +56,7 @@ static int poll_list_add(struct poll_list *restrict pl, int fd)
 	}
 
 	pl->fds[pl->nfds] = fd;
+	pl->handshake_complete[pl->nfds] = 0;
 	pl->nfds++;
 	pthread_mutex_unlock(&pl->mutex);
 	return 0;
@@ -69,6 +77,7 @@ static int poll_list_remove(struct poll_list *restrict pl, int fd)
 
 	if (i < pl->nfds - 1) {
 		memmove(&pl->fds[i], &pl->fds[i + 1], (pl->nfds - i - 1) * sizeof(*pl->fds));
+		memmove(&pl->handshake_complete[i], &pl->handshake_complete[i + 1], (pl->nfds - i - 1) * sizeof(*pl->handshake_complete));
 	}
 	pl->nfds--;
 
@@ -76,7 +85,8 @@ static int poll_list_remove(struct poll_list *restrict pl, int fd)
 	if (pl->nfds < half_cap) {
 		pl->cap = half_cap;
 		pl->fds = realloc(pl->fds, pl->cap * sizeof(*pl->fds));
-		if (pl->fds == NULL) {
+		pl->handshake_complete = realloc(pl->handshake_complete, pl->cap * sizeof(*pl->handshake_complete));
+		if (pl->fds == NULL || pl->handshake_complete == NULL) {
 			fprintf(stderr, "poll_list_add(): out of mem\n");
 			fflush(stderr);
 			return PL_ENOMEM;
@@ -86,20 +96,36 @@ static int poll_list_remove(struct poll_list *restrict pl, int fd)
 	return 0;
 }
 
-static struct pollfd *poll_list_alloc_cpy(struct poll_list *restrict pl)
+static void poll_list_alloc_cpy(struct poll_list *restrict pl, struct pollfd **fds, int *nfds, int **handshake_complete)
 {
 	pthread_mutex_lock(&pl->mutex);
-	struct pollfd *fds = malloc(pl->nfds * sizeof(*fds));
-	if (fds == NULL) {
-		fprintf(stderr, "poll_list_cpy(): out of memory\n");
-		fflush(stderr);
-		return NULL;
+	*nfds = pl->nfds;
+
+	*fds = malloc(pl->nfds * sizeof(**fds));
+	if (*fds == NULL) {
+		goto out_nofds;
 	}
+
+	*handshake_complete = malloc(pl->nfds * sizeof(**handshake_complete));
+	if (*handshake_complete == NULL) {
+		goto out_nohs;
+	}
+
 	for (nfds_t i = 0; i < pl->nfds; i++) {
-		fds[i].fd = pl->fds[i];
+		(*fds)[i].fd = pl->fds[i];
+		(*handshake_complete)[i] = pl->handshake_complete[i];
 	}
 	pthread_mutex_unlock(&pl->mutex);
-	return fds;
+	return;
+
+out_nohs:
+	free(*fds);
+out_nofds:
+	*fds = NULL;
+	*handshake_complete = NULL;
+	fprintf(stderr, "poll_list_cpy(): out of memory\n");
+	fflush(stderr);
+	pthread_mutex_unlock(&pl->mutex);
 }
 
 #endif /* POLL_LIST_H */

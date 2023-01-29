@@ -33,7 +33,7 @@ static void clear_serv_pipe(struct pollfd *restrict fds)
 	}
 }
 
-static int conn_reader(struct ws_ctube *ctube, struct pollfd *restrict fds, nfds_t nfds)
+static int conn_reader(struct ws_ctube *ctube, struct pollfd *restrict fds, nfds_t nfds, int *handshake_complete)
 {
 	(void)ctube;
 
@@ -48,9 +48,20 @@ static int conn_reader(struct ws_ctube *ctube, struct pollfd *restrict fds, nfds
 			continue;
 		}
 
-		ws_recv(fds[i].fd, msg, &msg_size, WS_CTUBE_BUFLEN);
-		if (ws_is_ping(msg, msg_size)) {
-			ws_pong(fds[i].fd, msg, msg_size);
+		if (!(handshake_complete[i])) {
+			if (ws_handshake(fds[i].fd) != 0) {
+				/* TODO handle error */
+				continue;
+			}
+			handshake_complete[i] = 1;
+		} else {
+			if (ws_recv(fds[i].fd, msg, &msg_size, WS_CTUBE_BUFLEN) != 0) {
+				/* TODO handle error */
+				continue;
+			}
+			if (ws_is_ping(msg, msg_size)) {
+				ws_pong(fds[i].fd, msg, msg_size);
+			}
 		}
 	}
 
@@ -67,7 +78,7 @@ static void conn_writer_cleanup(void *arg)
 	free(out_buf);
 }
 
-static int conn_writer(struct ws_ctube *restrict ctube, struct pollfd *restrict fds, nfds_t nfds)
+static int conn_writer(struct ws_ctube *restrict ctube, struct pollfd *restrict fds, nfds_t nfds, int *handshake_complete)
 {
 	int retval = 0;
 	char *out_buf = NULL;
@@ -103,6 +114,10 @@ static int conn_writer(struct ws_ctube *restrict ctube, struct pollfd *restrict 
 			continue;
 		}
 
+		if (!(handshake_complete[i])) {
+			continue;
+		}
+
 		ws_send(fds[i].fd, out_buf, out_buf_size);
 	}
 
@@ -132,26 +147,30 @@ static int prune_bad_conn(struct pollfd *restrict fds, struct poll_list *restric
 struct handler_main_arg {
 	struct ws_ctube *ctube;
 	struct poll_list *pl;
-	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds);
+	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds, int *handshake_complete);
 	pthread_barrier_t *handlers_ready;
 };
 
 static void *handler_main(void *arg)
 {
+	/* TODO cleanup fds and handshake_complete */
+
 	struct ws_ctube *ctube = ((struct handler_main_arg *)arg)->ctube;
 	struct poll_list *pl = ((struct handler_main_arg *)arg)->pl;
-	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds) = ((struct handler_main_arg *)arg)->handler_action;
+	int (*handler_action)(struct ws_ctube *ctube, struct pollfd *fds, nfds_t nfds, int *handshake_complete) = ((struct handler_main_arg *)arg)->handler_action;
 	pthread_barrier_t *handlers_ready = ((struct handler_main_arg *)arg)->handlers_ready;
 	pthread_barrier_wait(handlers_ready);
 
 	struct pollfd *fds = NULL;
+	int nfds;
+	int *handshake_complete;
 	for (;;) {
-		fds = poll_list_alloc_cpy(pl);
+		poll_list_alloc_cpy(pl, &fds, &nfds, &handshake_complete);
 		if (fds == NULL) {
 			goto out_err;
 		}
 
-		if (handler_action(ctube, fds, pl->nfds) != 0) {
+		if (handler_action(ctube, fds, nfds, handshake_complete) != 0) {
 			goto out_err;
 		}
 
@@ -163,11 +182,16 @@ static void *handler_main(void *arg)
 
 		free(fds);
 		fds = NULL;
+		free(handshake_complete);
+		handshake_complete = NULL;
 	}
 
 out_err:
 	if (fds != NULL) {
 		free(fds);
+	}
+	if (handshake_complete != NULL) {
+		free(handshake_complete);
 	}
 	fprintf(stderr, "handler_main(): error\n");
 	fflush(stderr);
