@@ -198,6 +198,7 @@ static int conn_writer(struct handler_arg *arg)
 	while (!(ctube->data_ready)) {
 		pthread_cond_wait(&ctube->data_ready_cond, &ctube->mutex);
 	}
+	ctube->data_ready = 0;
 
 	/* check for possible writable sockets for efficiency sake */
 	if (poll_events(arg->fds, arg->nfds, POLLOUT, 0) < 0) {
@@ -552,11 +553,12 @@ void ws_ctube_destroy(struct ws_ctube *ctube)
 	ctube->data = NULL;
 }
 
-void ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t bytes)
+void ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t nbytes)
 {
 	if (pthread_mutex_trylock(&ctube->mutex) == 0) {
-		ctube->data = realloc(ctube->data, bytes);
-		memcpy(ctube->data, data, bytes);
+		ctube->data = realloc(ctube->data, nbytes);
+		memcpy(ctube->data, data, nbytes);
+		ctube->data_size = nbytes;
 
 		ctube->data_ready = 1;
 		pthread_cond_broadcast(&ctube->data_ready_cond);
