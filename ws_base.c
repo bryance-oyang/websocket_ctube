@@ -8,7 +8,7 @@
 
 #include "crypt.h"
 
-#define WS_DEBUG 1
+#define WS_DEBUG 0
 #define WS_BUFLEN 4096
 
 static int send_all(int fd, char *buf, size_t len)
@@ -37,7 +37,7 @@ static int recv_all(int fd, char *buf, size_t buf_size, char *delim)
 			}
 			return -1;
 		}
-		if (strstr(buf, delim) != NULL)
+		if (delim != NULL && strstr(buf, delim) != NULL)
 			return 0;
 		buf += nrecv;
 		buf_size -= nrecv;
@@ -104,7 +104,7 @@ int ws_recv(int conn, char *msg, int *msg_size, int max_msg_size)
 	(void)msg;
 	(void)msg_size;
 	(void)max_msg_size;
-	return 0;
+	return -1;
 }
 
 int ws_is_ping(const char *msg, int msg_size)

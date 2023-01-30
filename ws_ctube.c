@@ -1,5 +1,7 @@
 /**
  * ws_ctube_init() spawns server thread, which spawns reader and writer threads
+ * both running under handler_main(), but have different handling functions
+ * conn_reader() and conn_writer()
  */
 
 #include <unistd.h>
@@ -71,7 +73,7 @@ static void pl_destroy_cpy(struct handler_arg *arg)
 	arg->handshake_complete = NULL;
 }
 
-static int poll_events(struct pollfd *fds, nfds_t nfds, short events, int timeout)
+static int _poll_events(struct pollfd *fds, nfds_t nfds, short events, int timeout)
 {
 	/* only reader will listen to server comms through pipe */
 	if (events & POLLIN) {
@@ -87,7 +89,7 @@ static int poll_events(struct pollfd *fds, nfds_t nfds, short events, int timeou
 	return poll(fds, nfds, timeout);
 }
 
-static void clear_serv_pipe(struct pollfd *fds)
+static void _clear_serv_pipe(struct pollfd *fds)
 {
 	char buf[WS_CTUBE_BUFLEN];
 	if (fds[0].revents & POLLIN) {
@@ -96,7 +98,7 @@ static void clear_serv_pipe(struct pollfd *fds)
 }
 
 /** update handshake and remove broken connections */
-static int update_pl_from_cpy(struct handler_arg *arg)
+static int _update_pl_from_cpy(struct handler_arg *arg)
 {
 	int retval = 0;
 	pthread_mutex_lock(&arg->pl->mutex);
@@ -104,17 +106,22 @@ static int update_pl_from_cpy(struct handler_arg *arg)
 	for (nfds_t i = 1; i < arg->nfds; i++) {
 		arg->pl->handshake_complete[i] = arg->handshake_complete[i];
 	}
+	pthread_mutex_unlock(&arg->pl->mutex);
 
 	/* remove broken connections */
 	for (nfds_t i = 1; i < arg->nfds; i++) {
 		if (arg->fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+			if (WS_CTUBE_DEBUG) {
+				printf("_update_pl_from_cpy(): removing broken conn %d\n", arg->fds[i].fd);
+				fflush(stdout);
+			}
+
 			if (poll_list_remove(arg->pl, arg->fds[i].fd) == PL_ENOMEM) {
 				retval = -1;
 				break;
 			}
 		}
 	}
-	pthread_mutex_unlock(&arg->pl->mutex);
 	return retval;
 }
 
@@ -126,7 +133,7 @@ static int conn_reader(struct handler_arg *arg)
 
 	/* poll and check if new connection signaled, if so make new cpy and repoll */
 	for (;;) {
-		if (poll_events(arg->fds, arg->nfds, POLLIN, -1) < 0) {
+		if (_poll_events(arg->fds, arg->nfds, POLLIN, -1) < 0) {
 			perror(NULL);
 			return -1;
 		}
@@ -134,7 +141,7 @@ static int conn_reader(struct handler_arg *arg)
 			/* no more new connections */
 			break;
 		}
-		clear_serv_pipe(arg->fds);
+		_clear_serv_pipe(arg->fds);
 		pl_destroy_cpy(arg);
 		pl_alloc_cpy(arg);
 	}
@@ -148,25 +155,27 @@ static int conn_reader(struct handler_arg *arg)
 
 		if (!(arg->handshake_complete[i])) {
 			if (ws_handshake(arg->fds[i].fd) != 0) {
-				arg->fds[i].revents = POLLERR;
+				arg->fds[i].revents = POLLHUP;
 				continue;
 			}
 			arg->handshake_complete[i] = 1;
 		} else {
 			if (ws_recv(arg->fds[i].fd, msg, &msg_size, WS_CTUBE_BUFLEN) != 0) {
-				arg->fds[i].revents = POLLERR;
+				arg->fds[i].revents = POLLHUP;
 				continue;
 			}
 			if (ws_is_ping(msg, msg_size)) {
 				if (ws_pong(arg->fds[i].fd, msg, msg_size) != 0) {
-					arg->fds[i].revents = POLLERR;
+					arg->fds[i].revents = POLLHUP;
 					continue;
 				}
 			}
 		}
 	}
 
-	if (update_pl_from_cpy(arg) != 0) {
+	if (_update_pl_from_cpy(arg) != 0) {
+		fprintf(stderr, "conn_reader(): error\n");
+		fflush(stderr);
 		return -1;
 	}
 
@@ -201,7 +210,7 @@ static int conn_writer(struct handler_arg *arg)
 	ctube->data_ready = 0;
 
 	/* check for possible writable sockets for efficiency sake */
-	if (poll_events(arg->fds, arg->nfds, POLLOUT, 0) < 0) {
+	if (_poll_events(arg->fds, arg->nfds, POLLOUT, 0) < 0) {
 		perror(NULL);
 		retval = -1;
 		goto out;
@@ -284,7 +293,7 @@ out_err:
 	return NULL;
 }
 
-static int bind_serv(int serv_sock, int port) {
+static int _bind_serv(int serv_sock, int port) {
 	struct sockaddr_in sa;
 	sa.sin_family = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -292,7 +301,7 @@ static int bind_serv(int serv_sock, int port) {
 	return bind(serv_sock, (struct sockaddr *)&sa, sizeof(sa));
 }
 
-static int serv_spawn_handlers(
+static int _serv_spawn_handlers(
 	struct ws_ctube *ctube,
 	struct poll_list *pl,
 	pthread_t *reader_tid,
@@ -331,7 +340,7 @@ out_nowriter:
 	pthread_cancel(*reader_tid);
 	pthread_join(*reader_tid, NULL);
 out_noreader:
-	fprintf(stderr, "serv_spawn_handlers(): failed\n");
+	fprintf(stderr, "_serv_spawn_handlers(): failed\n");
 	fflush(stderr);
 	return -1;
 }
@@ -428,7 +437,7 @@ static void *serv_main(void *arg)
 	}
 
 	/* set server socket address/port */
-	if (bind_serv(serv_sock, port) == -1) {
+	if (_bind_serv(serv_sock, port) == -1) {
 		perror(NULL);
 		goto out_nopipe;
 	}
@@ -457,7 +466,7 @@ static void *serv_main(void *arg)
 	/* spawn reader and writer */
 	pthread_t reader_tid, writer_tid;
 	pthread_barrier_t reader_ready, writer_ready;
-	if (serv_spawn_handlers(ctube, &pl, &reader_tid, &writer_tid, &reader_ready, &writer_ready) != 0) {
+	if (_serv_spawn_handlers(ctube, &pl, &reader_tid, &writer_tid, &reader_ready, &writer_ready) != 0) {
 		goto out_nohandlers;
 	}
 
@@ -491,7 +500,7 @@ out_nosock:
 	return NULL;
 }
 
-static int syncprim_init(struct ws_ctube *ctube)
+static int _syncprim_init(struct ws_ctube *ctube)
 {
 	pthread_mutexattr_t attr;
 	pthread_mutexattr_init(&attr);
@@ -504,7 +513,7 @@ static int syncprim_init(struct ws_ctube *ctube)
 	return 0;
 }
 
-static void syncprim_destroy(struct ws_ctube *ctube)
+static void _syncprim_destroy(struct ws_ctube *ctube)
 {
 	pthread_mutex_destroy(&ctube->mutex);
 	pthread_cond_destroy(&ctube->data_ready_cond);
@@ -516,7 +525,7 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit)
 	ctube->data = NULL;
 	ctube->data_size = 0;
 	ctube->data_ready = 0;
-	if (syncprim_init(ctube) != 0) {
+	if (_syncprim_init(ctube) != 0) {
 		goto out_nosyncprim;
 	}
 
@@ -535,9 +544,9 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit)
 	return serv_main_arg.serv_stat;
 
 out_nothread:
-	syncprim_destroy(ctube);
+	_syncprim_destroy(ctube);
 out_nosyncprim:
-	fprintf(stderr, "syncprim_init(): failed\n");
+	fprintf(stderr, "_syncprim_init(): failed\n");
 	fflush(stderr);
 	return -1;
 }
@@ -547,7 +556,7 @@ void ws_ctube_destroy(struct ws_ctube *ctube)
 	pthread_cancel(ctube->serv_tid);
 	pthread_join(ctube->serv_tid, NULL);
 
-	syncprim_destroy(ctube);
+	_syncprim_destroy(ctube);
 
 	free(ctube->data);
 	ctube->data = NULL;
