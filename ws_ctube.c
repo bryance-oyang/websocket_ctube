@@ -179,7 +179,7 @@ struct alloc_ctube_data_cpy_cleanup_arg {
 static void alloc_ctube_data_cpy_cleanup(void *arg)
 {
 	struct ws_ctube *ctube = ((struct alloc_ctube_data_cpy_cleanup_arg *)arg)->ctube;
-	ws_ctube_unlock(ctube);
+	pthread_mutex_unlock(&ctube->_mutex);
 }
 
 static char *alloc_ctube_data_cpy(struct handler_arg *arg, size_t *out_buf_size)
@@ -190,8 +190,7 @@ static char *alloc_ctube_data_cpy(struct handler_arg *arg, size_t *out_buf_size)
 		.ctube = arg->ctube
 	};
 
-	ws_ctube_lock(arg->ctube);
-
+	pthread_mutex_lock(&arg->ctube->_mutex);
 	pthread_cleanup_push(alloc_ctube_data_cpy_cleanup, &cleanup_arg)
 	while (!arg->ctube->_data_ready) {
 		pthread_cond_wait(&arg->ctube->_data_ready_cond, &arg->ctube->_mutex);
@@ -205,7 +204,7 @@ static char *alloc_ctube_data_cpy(struct handler_arg *arg, size_t *out_buf_size)
 		return NULL;
 	}
 	memcpy(out_buf, arg->ctube->data, *out_buf_size);
-	ws_ctube_unlock(arg->ctube);
+	pthread_mutex_unlock(&arg->ctube->_mutex);
 
 	return out_buf;
 }
@@ -590,20 +589,10 @@ void ws_ctube_destroy(struct ws_ctube *ctube)
 	ctube->data = NULL;
 }
 
-void ws_ctube_lock(struct ws_ctube *ctube)
-{
-	pthread_mutex_lock(&ctube->_mutex);
-}
-
-void ws_ctube_unlock(struct ws_ctube *ctube)
-{
-	pthread_mutex_unlock(&ctube->_mutex);
-}
-
 void ws_ctube_broadcast(struct ws_ctube *ctube)
 {
-	ws_ctube_lock(ctube);
+	pthread_mutex_lock(&ctube->_mutex);
 	ctube->_data_ready = 1;
 	pthread_cond_broadcast(&ctube->_data_ready_cond);
-	ws_ctube_unlock(ctube);
+	pthread_mutex_unlock(&ctube->_mutex);
 }
