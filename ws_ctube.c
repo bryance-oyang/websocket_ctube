@@ -71,7 +71,7 @@ static void pl_destroy_cpy(struct handler_arg *arg)
 	arg->handshake_complete = NULL;
 }
 
-static int poll_events(struct pollfd *fds, nfds_t nfds, short events)
+static int poll_events(struct pollfd *fds, nfds_t nfds, short events, int timeout)
 {
 	/* only reader will listen to server comms through pipe */
 	if (events & POLLIN) {
@@ -84,7 +84,7 @@ static int poll_events(struct pollfd *fds, nfds_t nfds, short events)
 		fds[i].events = events;
 	}
 
-	return poll(fds, nfds, -1);
+	return poll(fds, nfds, timeout);
 }
 
 static void clear_serv_pipe(struct pollfd *fds)
@@ -126,7 +126,8 @@ static int conn_reader(struct handler_arg *arg)
 
 	/* poll and check if new connection signaled, if so make new cpy and repoll */
 	for (;;) {
-		if (poll_events(arg->fds, arg->nfds, POLLIN) < 0) {
+		if (poll_events(arg->fds, arg->nfds, POLLIN, -1) < 0) {
+			perror(NULL);
 			return -1;
 		}
 		if ((arg->fds[0].revents & POLLIN) == 0) {
@@ -172,78 +173,40 @@ static int conn_reader(struct handler_arg *arg)
 	return 0;
 }
 
-struct alloc_ctube_data_cpy_cleanup_arg {
-	struct ws_ctube *ctube;
-};
-
-static void alloc_ctube_data_cpy_cleanup(void *arg)
-{
-	struct ws_ctube *ctube = ((struct alloc_ctube_data_cpy_cleanup_arg *)arg)->ctube;
-	pthread_mutex_unlock(&ctube->_mutex);
-}
-
-static char *alloc_ctube_data_cpy(struct handler_arg *arg, size_t *out_buf_size)
-{
-	char *out_buf;
-
-	struct alloc_ctube_data_cpy_cleanup_arg cleanup_arg = {
-		.ctube = arg->ctube
-	};
-
-	pthread_mutex_lock(&arg->ctube->_mutex);
-	pthread_cleanup_push(alloc_ctube_data_cpy_cleanup, &cleanup_arg)
-	while (!arg->ctube->_data_ready) {
-		pthread_cond_wait(&arg->ctube->_data_ready_cond, &arg->ctube->_mutex);
-	}
-	pthread_cleanup_pop(0);
-
-	*out_buf_size = arg->ctube->data_size;
-	out_buf = malloc(*out_buf_size * sizeof(*out_buf));
-	if (out_buf == NULL) {
-		ws_ctube_unlock(arg->ctube);
-		return NULL;
-	}
-	memcpy(out_buf, arg->ctube->data, *out_buf_size);
-	pthread_mutex_unlock(&arg->ctube->_mutex);
-
-	return out_buf;
-}
-
 struct conn_writer_cleanup_arg {
-	char *out_buf;
+	struct ws_ctube *ctube;
 };
 
 static void conn_writer_cleanup(void *arg)
 {
-	char *out_buf = ((struct conn_writer_cleanup_arg *)arg)->out_buf;
-	free(out_buf);
+	struct ws_ctube *ctube = ((struct conn_writer_cleanup_arg *)arg)->ctube;
+	pthread_mutex_unlock(&ctube->mutex);
 }
 
 /** writer waits for data to be ready, then broadcasts to all clients */
 static int conn_writer(struct handler_arg *arg)
 {
 	int retval = 0;
-	char *out_buf = NULL;
-	size_t out_buf_size;
-
-	/* wait and copy data into sending buffer */
-	out_buf = alloc_ctube_data_cpy(arg, &out_buf_size);
-	if (out_buf == NULL) {
-		retval = -1;
-		goto out_nodata;
-	}
-
+	struct ws_ctube *ctube = arg->ctube;
 	struct conn_writer_cleanup_arg cleanup_arg = {
-		.out_buf = out_buf
+		.ctube = ctube
 	};
 
+	pthread_mutex_lock(&ctube->mutex);
 	pthread_cleanup_push(conn_writer_cleanup, (void *)&cleanup_arg);
-	if (poll_events(arg->fds, arg->nfds, POLLOUT) < 0) {
+
+	while (!(ctube->data_ready)) {
+		pthread_cond_wait(&ctube->data_ready_cond, &ctube->mutex);
+	}
+
+	/* check for possible writable sockets for efficiency sake */
+	if (poll_events(arg->fds, arg->nfds, POLLOUT, 0) < 0) {
+		perror(NULL);
 		retval = -1;
 		goto out;
 	}
 
-	/* send data to all connected clients that are ready and completed handshake */
+	/* send data to all connected clients that were polled as ready and completed handshake */
 	for (nfds_t i = 1; i < arg->nfds; i++) {
 		if (!(arg->fds[i].revents & POLLOUT)) {
 			continue;
@@ -253,13 +216,12 @@ static int conn_writer(struct handler_arg *arg)
 			continue;
 		}
 
-		ws_send(arg->fds[i].fd, out_buf, out_buf_size);
+		ws_send(arg->fds[i].fd, ctube->data, ctube->data_size);
 	}
-	pthread_cleanup_pop(0);
 
 out:
-	free(out_buf);
-out_nodata:
+	pthread_cleanup_pop(0);
+	pthread_mutex_unlock(&arg->ctube->mutex);
 	return retval;
 }
 
@@ -533,26 +495,26 @@ static int syncprim_init(struct ws_ctube *ctube)
 	pthread_mutexattr_t attr;
 	pthread_mutexattr_init(&attr);
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&ctube->_mutex, &attr);
+	pthread_mutex_init(&ctube->mutex, &attr);
 	pthread_mutexattr_destroy(&attr);
 
-	pthread_cond_init(&ctube->_data_ready_cond, NULL);
-	pthread_barrier_init(&ctube->_server_ready, NULL, 2);
+	pthread_cond_init(&ctube->data_ready_cond, NULL);
+	pthread_barrier_init(&ctube->server_ready, NULL, 2);
 	return 0;
 }
 
 static void syncprim_destroy(struct ws_ctube *ctube)
 {
-	pthread_mutex_destroy(&ctube->_mutex);
-	pthread_cond_destroy(&ctube->_data_ready_cond);
-	pthread_barrier_destroy(&ctube->_server_ready);
+	pthread_mutex_destroy(&ctube->mutex);
+	pthread_cond_destroy(&ctube->data_ready_cond);
+	pthread_barrier_destroy(&ctube->server_ready);
 }
 
 int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit)
 {
 	ctube->data = NULL;
 	ctube->data_size = 0;
-	ctube->_data_ready = 0;
+	ctube->data_ready = 0;
 	if (syncprim_init(ctube) != 0) {
 		goto out_nosyncprim;
 	}
@@ -562,13 +524,13 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit)
 		.ctube = ctube,
 		.conn_limit = conn_limit,
 		.serv_stat = 0,
-		.server_ready = &ctube->_server_ready
+		.server_ready = &ctube->server_ready
 	};
-	if (pthread_create(&ctube->_serv_tid, NULL, serv_main, (void *)&serv_main_arg) != 0) {
+	if (pthread_create(&ctube->serv_tid, NULL, serv_main, (void *)&serv_main_arg) != 0) {
 		goto out_nothread;
 	}
 
-	pthread_barrier_wait(&ctube->_server_ready);
+	pthread_barrier_wait(&ctube->server_ready);
 	return serv_main_arg.serv_stat;
 
 out_nothread:
@@ -581,18 +543,23 @@ out_nosyncprim:
 
 void ws_ctube_destroy(struct ws_ctube *ctube)
 {
-	pthread_cancel(ctube->_serv_tid);
-	pthread_join(ctube->_serv_tid, NULL);
+	pthread_cancel(ctube->serv_tid);
+	pthread_join(ctube->serv_tid, NULL);
 
 	syncprim_destroy(ctube);
 
+	free(ctube->data);
 	ctube->data = NULL;
 }
 
-void ws_ctube_broadcast(struct ws_ctube *ctube)
+void ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t bytes)
 {
-	pthread_mutex_lock(&ctube->_mutex);
-	ctube->_data_ready = 1;
-	pthread_cond_broadcast(&ctube->_data_ready_cond);
-	pthread_mutex_unlock(&ctube->_mutex);
+	if (pthread_mutex_trylock(&ctube->mutex) == 0) {
+		ctube->data = realloc(ctube->data, bytes);
+		memcpy(ctube->data, data, bytes);
+
+		ctube->data_ready = 1;
+		pthread_cond_broadcast(&ctube->data_ready_cond);
+		pthread_mutex_unlock(&ctube->mutex);
+	}
 }

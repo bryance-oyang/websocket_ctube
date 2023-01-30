@@ -14,8 +14,11 @@
 static int send_all(int fd, char *buf, size_t len)
 {
 	while (len > 0) {
-		int nsent = send(fd, buf, len, MSG_NOSIGNAL);
+		int nsent = send(fd, buf, len, MSG_NOSIGNAL | MSG_DONTWAIT);
 		if (nsent < 1) {
+			if (WS_DEBUG) {
+				perror(NULL);
+			}
 			return -1;
 		}
 		buf += nsent;
@@ -27,8 +30,11 @@ static int send_all(int fd, char *buf, size_t len)
 static int recv_all(int fd, char *buf, size_t buf_size, char *delim)
 {
 	while (buf_size > 0) {
-		int nrecv = recv(fd, buf, buf_size, 0);
-		if (nrecv < 0) {
+		int nrecv = recv(fd, buf, buf_size, MSG_NOSIGNAL | MSG_DONTWAIT);
+		if (nrecv < 1) {
+			if (WS_DEBUG) {
+				perror(NULL);
+			}
 			return -1;
 		}
 		if (strstr(buf, delim) != NULL)
