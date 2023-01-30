@@ -12,6 +12,7 @@ struct ws_ctube {
 	pthread_cond_t _data_ready_cond;
 
 	pthread_t _serv_tid;
+	pthread_barrier_t _server_ready;
 };
 
 int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit);

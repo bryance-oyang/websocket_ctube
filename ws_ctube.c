@@ -16,6 +16,7 @@
 #include "ws_base.h"
 #include "poll_list.h"
 
+#define WS_CTUBE_DEBUG 1
 #define WS_CTUBE_BUFLEN 4096
 
 struct handler_arg {
@@ -100,7 +101,7 @@ static int update_pl_from_cpy(struct handler_arg *arg)
 	int retval = 0;
 	pthread_mutex_lock(&arg->pl->mutex);
 	/* update handshake status */
-	for (nfds_t i = 1; i < arg->pl->nfds; i++) {
+	for (nfds_t i = 1; i < arg->nfds; i++) {
 		arg->pl->handshake_complete[i] = arg->handshake_complete[i];
 	}
 
@@ -276,7 +277,7 @@ struct handler_main_arg {
 	struct ws_ctube *ctube;
 	struct poll_list *pl;
 	int (*handler_action)(struct handler_arg *arg);
-	pthread_barrier_t *handlers_ready;
+	pthread_barrier_t *handler_ready;
 };
 
 static void *handler_main(void *arg)
@@ -284,8 +285,9 @@ static void *handler_main(void *arg)
 	struct ws_ctube *ctube = ((struct handler_main_arg *)arg)->ctube;
 	struct poll_list *pl = ((struct handler_main_arg *)arg)->pl;
 	int (*handler_action)(struct handler_arg *arg) = ((struct handler_main_arg *)arg)->handler_action;
-	pthread_barrier_t *handlers_ready = ((struct handler_main_arg *)arg)->handlers_ready;
-	pthread_barrier_wait(handlers_ready);
+	pthread_barrier_t *handler_ready = ((struct handler_main_arg *)arg)->handler_ready;
+
+	pthread_barrier_wait(handler_ready);
 
 	int handler_retval;
 	struct handler_arg handler_arg = {
@@ -328,40 +330,45 @@ static int bind_serv(int serv_sock, int port) {
 	return bind(serv_sock, (struct sockaddr *)&sa, sizeof(sa));
 }
 
-static int serv_spawn_handlers(struct ws_ctube *ctube, struct poll_list *pl, pthread_t *reader_tid, pthread_t *writer_tid)
+static int serv_spawn_handlers(
+	struct ws_ctube *ctube,
+	struct poll_list *pl,
+	pthread_t *reader_tid,
+	pthread_t *writer_tid,
+	pthread_barrier_t *reader_ready,
+	pthread_barrier_t *writer_ready)
 {
-	pthread_barrier_t handlers_ready;
-	pthread_barrier_init(&handlers_ready, NULL, 3);
-
+	pthread_barrier_init(reader_ready, NULL, 2);
 	struct handler_main_arg reader_arg = {
 		.ctube = ctube,
 		.pl = pl,
 		.handler_action = conn_reader,
-		.handlers_ready = &handlers_ready
+		.handler_ready = reader_ready
 	};
 	if (pthread_create(reader_tid, NULL, handler_main, (void *)&reader_arg) != 0) {
 		goto out_noreader;
 	}
+	pthread_barrier_wait(reader_ready);
 
+	pthread_barrier_init(writer_ready, NULL, 2);
 	struct handler_main_arg writer_arg = {
 		.ctube = ctube,
 		.pl = pl,
 		.handler_action = conn_writer,
-		.handlers_ready = &handlers_ready
+		.handler_ready = writer_ready
 	};
 	if (pthread_create(writer_tid, NULL, handler_main, (void *)&writer_arg) != 0) {
 		goto out_nowriter;
 	}
+	pthread_barrier_wait(writer_ready);
 
-	pthread_barrier_wait(&handlers_ready);
-	pthread_barrier_destroy(&handlers_ready);
 	return 0;
 
 out_nowriter:
+	pthread_barrier_wait(reader_ready);
 	pthread_cancel(*reader_tid);
 	pthread_join(*reader_tid, NULL);
 out_noreader:
-	pthread_barrier_destroy(&handlers_ready);
 	fprintf(stderr, "serv_spawn_handlers(): failed\n");
 	fflush(stderr);
 	return -1;
@@ -391,6 +398,8 @@ struct serv_cleanup_arg {
 	int *serv_pipe;
 	pthread_t reader_tid;
 	pthread_t writer_tid;
+	pthread_barrier_t *reader_ready;
+	pthread_barrier_t *writer_ready;
 	struct poll_list *pl;
 };
 
@@ -398,15 +407,25 @@ static void serv_cleanup(void *arg)
 {
 	int serv_sock = ((struct serv_cleanup_arg *)arg)->serv_sock;
 	int *serv_pipe = ((struct serv_cleanup_arg *)arg)->serv_pipe;
+
 	pthread_t reader_tid = ((struct serv_cleanup_arg *)arg)->reader_tid;
 	pthread_t writer_tid = ((struct serv_cleanup_arg *)arg)->writer_tid;
+
+	pthread_barrier_t *reader_ready = ((struct serv_cleanup_arg *)arg)->reader_ready;
+	pthread_barrier_t *writer_ready = ((struct serv_cleanup_arg *)arg)->writer_ready;
+
 	struct poll_list *pl = ((struct serv_cleanup_arg *)arg)->pl;
 
 	pthread_cancel(writer_tid);
 	pthread_cancel(reader_tid);
 	pthread_join(writer_tid, NULL);
 	pthread_join(reader_tid, NULL);
+
+	pthread_barrier_destroy(reader_ready);
+	pthread_barrier_destroy(writer_ready);
+
 	poll_list_destroy(pl);
+
 	close(serv_pipe[0]);
 	close(serv_pipe[1]);
 	close(serv_sock);
@@ -418,7 +437,7 @@ struct serv_main_arg {
 	int conn_limit;
 
 	int serv_stat;
-	pthread_barrier_t server_ready;
+	pthread_barrier_t *server_ready;
 };
 
 /** main for server */
@@ -428,7 +447,7 @@ static void *serv_main(void *arg)
 	struct ws_ctube *ctube = ((struct serv_main_arg *)arg)->ctube;
 	int conn_limit = ((struct serv_main_arg *)arg)->conn_limit;
 	int *serv_stat = &((struct serv_main_arg *)arg)->serv_stat;
-	pthread_barrier_t *server_ready = &((struct serv_main_arg *)arg)->server_ready;
+	pthread_barrier_t *server_ready = ((struct serv_main_arg *)arg)->server_ready;
 
 	int serv_pipe[2];
 	int serv_sock;
@@ -475,7 +494,8 @@ static void *serv_main(void *arg)
 
 	/* spawn reader and writer */
 	pthread_t reader_tid, writer_tid;
-	if (serv_spawn_handlers(ctube, &pl, &reader_tid, &writer_tid) != 0) {
+	pthread_barrier_t reader_ready, writer_ready;
+	if (serv_spawn_handlers(ctube, &pl, &reader_tid, &writer_tid, &reader_ready, &writer_ready) != 0) {
 		goto out_nohandlers;
 	}
 
@@ -486,6 +506,8 @@ static void *serv_main(void *arg)
 		.serv_pipe = serv_pipe,
 		.reader_tid = reader_tid,
 		.writer_tid = writer_tid,
+		.reader_ready = &reader_ready,
+		.writer_ready = &writer_ready,
 		.pl = &pl
 	};
 	pthread_cleanup_push(serv_cleanup, (void *)&serv_cleanup_arg);
@@ -494,6 +516,8 @@ static void *serv_main(void *arg)
 	pthread_cleanup_pop(0);
 
 	/* code doesn't get here unless error */
+	pthread_barrier_destroy(&reader_ready);
+	pthread_barrier_destroy(&writer_ready);
 out_nohandlers:
 	close(serv_pipe[0]);
 	close(serv_pipe[1]);
@@ -514,7 +538,15 @@ static int syncprim_init(struct ws_ctube *ctube)
 	pthread_mutexattr_destroy(&attr);
 
 	pthread_cond_init(&ctube->_data_ready_cond, NULL);
+	pthread_barrier_init(&ctube->_server_ready, NULL, 2);
 	return 0;
+}
+
+static void syncprim_destroy(struct ws_ctube *ctube)
+{
+	pthread_mutex_destroy(&ctube->_mutex);
+	pthread_cond_destroy(&ctube->_data_ready_cond);
+	pthread_barrier_destroy(&ctube->_server_ready);
 }
 
 int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit)
@@ -523,26 +555,39 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit)
 	ctube->data_size = 0;
 	ctube->_data_ready = 0;
 	if (syncprim_init(ctube) != 0) {
-		fprintf(stderr, "syncprim_init(): failed\n");
-		fflush(stderr);
-		return -1;
+		goto out_nosyncprim;
 	}
 
-	struct serv_main_arg serv_main_arg;
-	serv_main_arg.port = port;
-	serv_main_arg.ctube = ctube;
-	serv_main_arg.conn_limit = conn_limit;
-	serv_main_arg.serv_stat = 0;
-	pthread_barrier_init(&serv_main_arg.server_ready, NULL, 2);
-
+	struct serv_main_arg serv_main_arg = {
+		.port = port,
+		.ctube = ctube,
+		.conn_limit = conn_limit,
+		.serv_stat = 0,
+		.server_ready = &ctube->_server_ready
+	};
 	if (pthread_create(&ctube->_serv_tid, NULL, serv_main, (void *)&serv_main_arg) != 0) {
-		pthread_barrier_destroy(&serv_main_arg.server_ready);
-		return -1;
-	} else {
-		pthread_barrier_wait(&serv_main_arg.server_ready);
-		pthread_barrier_destroy(&serv_main_arg.server_ready);
-		return serv_main_arg.serv_stat;
+		goto out_nothread;
 	}
+
+	pthread_barrier_wait(&ctube->_server_ready);
+	return serv_main_arg.serv_stat;
+
+out_nothread:
+	syncprim_destroy(ctube);
+out_nosyncprim:
+	fprintf(stderr, "syncprim_init(): failed\n");
+	fflush(stderr);
+	return -1;
+}
+
+void ws_ctube_destroy(struct ws_ctube *ctube)
+{
+	pthread_cancel(ctube->_serv_tid);
+	pthread_join(ctube->_serv_tid, NULL);
+
+	syncprim_destroy(ctube);
+
+	ctube->data = NULL;
 }
 
 void ws_ctube_lock(struct ws_ctube *ctube)
@@ -561,15 +606,4 @@ void ws_ctube_broadcast(struct ws_ctube *ctube)
 	ctube->_data_ready = 1;
 	pthread_cond_broadcast(&ctube->_data_ready_cond);
 	ws_ctube_unlock(ctube);
-}
-
-void ws_ctube_destroy(struct ws_ctube *ctube)
-{
-	pthread_cancel(ctube->_serv_tid);
-	pthread_join(ctube->_serv_tid, NULL);
-
-	pthread_mutex_destroy(&ctube->_mutex);
-	pthread_cond_destroy(&ctube->_data_ready_cond);
-
-	ctube->data = NULL;
 }
