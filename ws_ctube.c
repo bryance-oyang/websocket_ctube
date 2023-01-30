@@ -531,12 +531,7 @@ out_nosock:
 
 static int syncprim_init(struct ws_ctube *ctube)
 {
-	pthread_mutexattr_t attr;
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(&ctube->_mutex, &attr);
-	pthread_mutexattr_destroy(&attr);
-
+	pthread_mutex_init(&ctube->_mutex, NULL);
 	pthread_cond_init(&ctube->_data_ready_cond, NULL);
 	pthread_barrier_init(&ctube->_server_ready, NULL, 2);
 	return 0;
