@@ -186,17 +186,17 @@ static char *alloc_ctube_data_cpy(struct handler_arg *arg, size_t *out_buf_size)
 {
 	char *out_buf;
 
-	ws_ctube_lock(arg->ctube);
-
 	struct alloc_ctube_data_cpy_cleanup_arg cleanup_arg = {
 		.ctube = arg->ctube
 	};
 
+	ws_ctube_lock(arg->ctube);
+
+	pthread_cleanup_push(alloc_ctube_data_cpy_cleanup, &cleanup_arg)
 	while (!arg->ctube->_data_ready) {
-		pthread_cleanup_push(alloc_ctube_data_cpy_cleanup, &cleanup_arg)
 		pthread_cond_wait(&arg->ctube->_data_ready_cond, &arg->ctube->_mutex);
-		pthread_cleanup_pop(0);
 	}
+	pthread_cleanup_pop(0);
 
 	*out_buf_size = arg->ctube->data_size;
 	out_buf = malloc(*out_buf_size * sizeof(*out_buf));
