@@ -1,3 +1,11 @@
+/**
+ * shared master list of connections to server to be polled
+ *
+ * the list should be copied and the copy should be polled so that mutex can be released
+ *
+ * the 0th fds can be a pipe for the server thread to communicate with handler threads
+ */
+
 #ifndef POLL_LIST_H
 #define POLL_LIST_H
 

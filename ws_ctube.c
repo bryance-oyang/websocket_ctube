@@ -1,3 +1,7 @@
+/**
+ * ws_ctube_init() spawns server thread, which spawns reader and writer threads
+ */
+
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -68,6 +72,7 @@ static void pl_destroy_cpy(struct handler_arg *arg)
 
 static int poll_events(struct pollfd *fds, nfds_t nfds, short events)
 {
+	/* only reader will listen to server comms through pipe */
 	if (events & POLLIN) {
 		fds[0].events = POLLIN;
 	} else {
@@ -151,7 +156,10 @@ static int conn_reader(struct handler_arg *arg)
 				continue;
 			}
 			if (ws_is_ping(msg, msg_size)) {
-				ws_pong(arg->fds[i].fd, msg, msg_size);
+				if (ws_pong(arg->fds[i].fd, msg, msg_size) != 0) {
+					arg->fds[i].revents = POLLERR;
+					continue;
+				}
 			}
 		}
 	}
@@ -161,6 +169,44 @@ static int conn_reader(struct handler_arg *arg)
 	}
 
 	return 0;
+}
+
+struct alloc_ctube_data_cpy_cleanup_arg {
+	struct ws_ctube *ctube;
+};
+
+static void alloc_ctube_data_cpy_cleanup(void *arg)
+{
+	struct ws_ctube *ctube = ((struct alloc_ctube_data_cpy_cleanup_arg *)arg)->ctube;
+	ws_ctube_unlock(ctube);
+}
+
+static char *alloc_ctube_data_cpy(struct handler_arg *arg, size_t *out_buf_size)
+{
+	char *out_buf;
+
+	ws_ctube_lock(arg->ctube);
+
+	struct alloc_ctube_data_cpy_cleanup_arg cleanup_arg = {
+		.ctube = arg->ctube
+	};
+
+	while (!arg->ctube->_data_ready) {
+		pthread_cleanup_push(alloc_ctube_data_cpy_cleanup, &cleanup_arg)
+		pthread_cond_wait(&arg->ctube->_data_ready_cond, &arg->ctube->_mutex);
+		pthread_cleanup_pop(0);
+	}
+
+	*out_buf_size = arg->ctube->data_size;
+	out_buf = malloc(*out_buf_size * sizeof(*out_buf));
+	if (out_buf == NULL) {
+		ws_ctube_unlock(arg->ctube);
+		return NULL;
+	}
+	memcpy(out_buf, arg->ctube->data, *out_buf_size);
+	ws_ctube_unlock(arg->ctube);
+
+	return out_buf;
 }
 
 struct conn_writer_cleanup_arg {
@@ -173,6 +219,7 @@ static void conn_writer_cleanup(void *arg)
 	free(out_buf);
 }
 
+/** writer waits for data to be ready, then broadcasts to all clients */
 static int conn_writer(struct handler_arg *arg)
 {
 	int retval = 0;
@@ -180,30 +227,23 @@ static int conn_writer(struct handler_arg *arg)
 	size_t out_buf_size;
 
 	/* wait and copy data into sending buffer */
-	ws_ctube_lock(arg->ctube);
-	while (!arg->ctube->_data_ready) {
-		pthread_cond_wait(&arg->ctube->_data_ready_cond, &arg->ctube->_mutex);
-	}
-	out_buf_size = arg->ctube->data_size;
-	out_buf = malloc(out_buf_size * sizeof(*out_buf));
+	out_buf = alloc_ctube_data_cpy(arg, &out_buf_size);
 	if (out_buf == NULL) {
-		ws_ctube_unlock(arg->ctube);
 		retval = -1;
 		goto out_nodata;
 	}
-	memcpy(out_buf, arg->ctube->data, out_buf_size);
-	ws_ctube_unlock(arg->ctube);
 
 	struct conn_writer_cleanup_arg cleanup_arg = {
 		.out_buf = out_buf
 	};
-	pthread_cleanup_push(conn_writer_cleanup, (void *)&cleanup_arg);
 
+	pthread_cleanup_push(conn_writer_cleanup, (void *)&cleanup_arg);
 	if (poll_events(arg->fds, arg->nfds, POLLOUT) < 0) {
 		retval = -1;
 		goto out;
 	}
 
+	/* send data to all connected clients that are ready and completed handshake */
 	for (nfds_t i = 1; i < arg->nfds; i++) {
 		if (!(arg->fds[i].revents & POLLOUT)) {
 			continue;
@@ -215,8 +255,8 @@ static int conn_writer(struct handler_arg *arg)
 
 		ws_send(arg->fds[i].fd, out_buf, out_buf_size);
 	}
-
 	pthread_cleanup_pop(0);
+
 out:
 	free(out_buf);
 out_nodata:
@@ -241,8 +281,6 @@ struct handler_main_arg {
 
 static void *handler_main(void *arg)
 {
-	/* TODO cleanup fds and handshake_complete */
-
 	struct ws_ctube *ctube = ((struct handler_main_arg *)arg)->ctube;
 	struct poll_list *pl = ((struct handler_main_arg *)arg)->pl;
 	int (*handler_action)(struct handler_arg *arg) = ((struct handler_main_arg *)arg)->handler_action;
@@ -532,4 +570,6 @@ void ws_ctube_destroy(struct ws_ctube *ctube)
 
 	pthread_mutex_destroy(&ctube->_mutex);
 	pthread_cond_destroy(&ctube->_data_ready_cond);
+
+	ctube->data = NULL;
 }
