@@ -14,13 +14,15 @@
 #define WS_CTUBE_DEBUG 1
 #define WS_CTUBE_BUFLEN 4096
 
+typedef void (*cleanup_f)(void *);
+
 static int ws_dframe_init(struct ws_dframes *df)
 {
 	df->frames = NULL;
 	df->frames_size = 0;
 
 	df->refs = 0;
-	pthread_mutex_init(&df->refs_mutex);
+	pthread_mutex_init(&df->refs_mutex, NULL);
 }
 
 static void ws_dframe_destroy(struct ws_dframes *df)
@@ -59,26 +61,20 @@ struct conn_struct {
 	pthread_mutex_t list_mutex;
 
 	int fd;
+	struct ws_ctube *ctube;
 
-	pthread_t protocol_tid;
-	pthread_t sender_tid;
-
-	int sender_inited;
-	pthread_mutex_t sender_inited_mutex;
-	pthread_cond_t sender_inited_cond;
+	pthread_t reader_tid;
+	pthread_t writer_tid;
 };
 
-static int conn_struct_init(struct conn_struct *conn)
+static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *ctube)
 {
 	conn->next = NULL;
 	conn->prev = NULL;
-	pthread_mutex_init(&conn->list_mutex);
+	pthread_mutex_init(&conn->list_mutex, NULL);
 
-	conn->fd = -1;
-
-	conn->sender_inited = 0;
-	pthread_mutex_init(&conn->sender_inited_mutex);
-	pthread_cond_init(&conn->sender_inited_cond);
+	conn->fd = fd;
+	conn->ctube = ctube;
 }
 
 static void conn_struct_destroy(struct conn_struct *conn)
@@ -88,21 +84,19 @@ static void conn_struct_destroy(struct conn_struct *conn)
 	pthread_mutex_destroy(&conn->list_mutex);
 
 	conn->fd = -1;
-
-	conn->sender_inited = 0;
-	pthread_mutex_destroy(&conn->sender_inited_mutex);
-	pthread_cond_destroy(&conn->sender_inited_cond);
+	conn->ctube = NULL;
 }
 
 struct conn_list {
+	/* sentinels */
 	struct conn_struct head;
 	struct conn_struct tail;
 };
 
 static int conn_list_init(struct conn_list *clist)
 {
-	conn_struct_init(&clist->head);
-	conn_struct_init(&clist->tail);
+	conn_struct_init(&clist->head, NULL);
+	conn_struct_init(&clist->tail, NULL);
 	clist->head.next = &clist->tail;
 	clist->tail.prev = &clist->head;
 }
@@ -149,141 +143,156 @@ static void conn_list_remove(struct conn_struct *conn)
 	pthread_mutex_unlock(&a->list_mutex);
 }
 
-static void serv_forever()
+static int bind_server(int server_sock, int port) {
+	struct sockaddr_in sa;
+	sa.sin_family = AF_INET;
+	sa.sin_addr.s_addr = htonl(INADDR_ANY);
+	sa.sin_port = htons(port);
+	return bind(server_sock, (struct sockaddr *)&sa, sizeof(sa));
+}
+
+static void serve_forever()
 {
 }
 
-struct serv_cleanup_arg {
-	int serv_sock;
-};
-
-static void serv_cleanup(void *arg)
-{
-	int serv_sock = ((struct serv_cleanup_arg *)arg)->serv_sock;
-	close(serv_sock);
-}
-
-/** main for server */
 static void *serv_main(void *arg)
 {
-	int port = ((struct serv_main_arg *)arg)->port;
-	struct ws_ctube *ctube = ((struct serv_main_arg *)arg)->ctube;
-	int conn_limit = ((struct serv_main_arg *)arg)->conn_limit;
-	int *serv_stat = &((struct serv_main_arg *)arg)->serv_stat;
-	pthread_barrier_t *server_ready = ((struct serv_main_arg *)arg)->server_ready;
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 
-	int serv_pipe[2];
-	int serv_sock;
+	/* create conn list */
+	struct conn_list clist;
+	if (conn_list_init(&clist) != 0) {
+		goto err_noclist;
+	}
+	pthread_cleanup_push((cleanup_f)conn_list_destroy,
 
 	/* create server socket */
-	serv_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (serv_sock == -1) {
+	int server_sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (server_sock == -1) {
 		perror(NULL);
-		goto out_nosock;
+		goto err_nosock;
 	}
-	int true = 1;
-	if (setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &true,
-		   sizeof(int)) == -1) {
+	ctube->server_sock = server_sock;
+
+	int yes = 1;
+	if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &yes,
+		   sizeof(yes)) == -1) {
 		perror(NULL);
 		goto out_nopipe;
 	}
 
 	/* set server socket address/port */
-	if (_bind_serv(serv_sock, port) == -1) {
+	if (bind_server(server_sock, ctube->port) == -1) {
 		perror(NULL);
 		goto out_nopipe;
 	}
 
 	/* set listening */
-	if (listen(serv_sock, 1) == -1) {
+	if (listen(server_sock, 1) == -1) {
 		perror(NULL);
 		goto out_nopipe;
 	}
 
 	/* success */
-	*serv_stat = 0;
-	struct serv_cleanup_arg serv_cleanup_arg = {
-		.serv_sock = serv_sock,
-	};
-	pthread_cleanup_push(serv_cleanup, (void *)&serv_cleanup_arg);
-	pthread_barrier_wait(server_ready);
-	serv_forever(serv_sock, serv_pipe[1], &pl);
+	pthread_cleanup_push(server_cleanup, (void *)ctube);
+	serve_forever();
 	pthread_cleanup_pop(0);
 
 	/* code doesn't get here unless error */
-	pthread_barrier_destroy(&reader_ready);
-	pthread_barrier_destroy(&writer_ready);
-out_nohandlers:
-	close(serv_pipe[0]);
-	close(serv_pipe[1]);
 out_nopipe:
-	close(serv_sock);
-out_nosock:
-	*serv_stat = -1;
-	pthread_barrier_wait(server_ready);
+	close(server_sock);
+err_nosock:
 	return NULL;
-}
-
-static int _syncprim_init(struct ws_ctube *ctube)
-{
-	return 0;
-}
-
-static void _syncprim_destroy(struct ws_ctube *ctube)
-{
 }
 
 int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_ms)
 {
+	ctube->server_sock = -1;
+	ctube->port = port;
+	ctube->conn_limit = conn_limit;
+	ctube->timeout.tv_sec = 0;
+	ctube->timeout.tv_nsec = timeout_ms * 1000000;
+
 	ctube->data = NULL;
 	ctube->data_size = 0;
-	ctube->data_ready = 0;
-	if (_syncprim_init(ctube) != 0) {
-		goto out_nosyncprim;
+	pthread_mutex_init(&ctube->data_mutex, NULL);
+	pthread_cond_init(&ctube->data_cond, NULL);
+
+	ctube->dframes = NULL;
+	pthread_mutex_init(&ctube->dframes_mutex, NULL);
+	pthread_cond_init(&ctube->dframes_cond, NULL);
+
+	ctube->server_inited = 0;
+	pthread_mutex_init(&ctube->server_init_mutex, NULL);
+	pthread_cond_init(&ctube->server_init_cond, NULL);
+
+	if (pthread_create(&ctube->framer_tid, NULL, framer_main, (void *)ctube) != 0) {
+		fprintf(stderr, "ws_ctube_init(): create framer failed\n");
+		goto err_noframer;
 	}
 
-	struct serv_main_arg serv_main_arg = {
-		.port = port,
-		.ctube = ctube,
-		.conn_limit = conn_limit,
-		.serv_stat = 0,
-		.server_ready = &ctube->server_ready
-	};
-	if (pthread_create(&ctube->serv_tid, NULL, serv_main, (void *)&serv_main_arg) != 0) {
-		goto out_nothread;
+	if (pthread_create(&ctube->server_tid, NULL, server_main, (void *)ctube) != 0) {
+		fprintf(stderr, "ws_ctube_init(): create server failed\n");
+		goto err_noserver;
 	}
 
-	pthread_barrier_wait(&ctube->server_ready);
-	return serv_main_arg.serv_stat;
+	pthread_mutex_lock(&ctube->server_init_mutex);
+	while (!ctube->server_inited) {
+		pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout);
+	}
+	if (ctube->server_inited < 0) {
+		fprintf(stderr, "ws_ctube_init(): server failed to init\n");
+		pthread_mutex_unlock(&ctube->server_init_mutex);
+		goto err_noserver;
+	}
+	pthread_mutex_unlock(&ctube->server_init_mutex);
 
-out_nothread:
-	_syncprim_destroy(ctube);
-out_nosyncprim:
-	fprintf(stderr, "_syncprim_init(): failed\n");
-	fflush(stderr);
+	return 0;
+
+err_noserver:
+	pthread_cancel(ctube->framer_tid);
+	pthread_join(ctube->framer_tid);
+err_noframer:
 	return -1;
 }
 
 void ws_ctube_destroy(struct ws_ctube *ctube)
 {
-	pthread_cancel(ctube->serv_tid);
-	pthread_join(ctube->serv_tid, NULL);
+	pthread_cancel(ctube->framer_tid);
+	pthread_cancel(ctube->server_tid);
+	pthread_join(ctube->framer_tid);
+	pthread_join(ctube->server_tid);
 
-	_syncprim_destroy(ctube);
+	ctube->server_sock = -1;
+	ctube->port = -1;
+	ctube->conn_limit = -1;
+	ctube->timeout.tv_sec = 0;
+	ctube->timeout.tv_nsec = 0;
 
-	free(ctube->data);
 	ctube->data = NULL;
+	ctube->data_size = 0;
+	pthread_mutex_destroy(&ctube->data_mutex);
+	pthread_cond_destroy(&ctube->data_cond);
+
+	ctube->dframes = NULL;
+	pthread_mutex_destroy(&ctube->dframes_mutex);
+	pthread_cond_destroy(&ctube->dframes_cond);
+
+	ctube->server_inited = 0;
+	pthread_mutex_destroy(&ctube->server_init_mutex);
+	pthread_cond_destroy(&ctube->server_init_cond);
 }
 
-void ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
+int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
 {
-	if (pthread_mutex_trylock(&ctube->mutex) == 0) {
-		ctube->data = realloc(ctube->data, data_size);
+	if (pthread_mutex_trylock(&ctube->data_mutex) == 0) {
+		ctube->data = malloc(data_size);
 		memcpy(ctube->data, data, data_size);
 		ctube->data_size = data_size;
-
-		ctube->data_ready = 1;
-		pthread_cond_broadcast(&ctube->data_ready_cond);
-		pthread_mutex_unlock(&ctube->mutex);
+		pthread_cond_signal(&ctube->data_cond);
+		pthread_mutex_unlock(&ctube->data_mutex);
+		return 0;
+	} else {
+		return -1;
 	}
 }

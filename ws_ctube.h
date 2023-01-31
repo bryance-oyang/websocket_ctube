@@ -2,6 +2,7 @@
 #define WS_CTUBE_H
 
 #include <pthread.h>
+#include <time.h>
 
 struct ws_dframes {
 	char *frames;
@@ -12,9 +13,10 @@ struct ws_dframes {
 };
 
 struct ws_ctube {
+	int server_sock;
 	int port;
 	int conn_limit;
-	int timeout_ms;
+	struct timespec timeout;
 
 	void *data;
 	size_t data_size;
@@ -25,16 +27,16 @@ struct ws_ctube {
 	pthread_mutex_t dframes_mutex;
 	pthread_cond_t dframes_cond;
 
-	pthread_t server_tid;
 	pthread_t framer_tid;
+	pthread_t server_tid;
 
 	int server_inited;
-	pthread_mutex_t server_inited_mutex;
-	pthread_cond_t server_inited_cond;
+	pthread_mutex_t server_init_mutex;
+	pthread_cond_t server_init_cond;
 };
 
 int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_ms);
 void ws_ctube_destroy(struct ws_ctube *ctube);
-void ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size);
+int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size);
 
 #endif /* WS_CTUBE_H */
