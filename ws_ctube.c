@@ -32,6 +32,8 @@ static void ws_dframe_destroy(struct ws_dframes *df)
 		df->frames = NULL;
 	}
 	df->frames_size = 0;
+
+	df->refs = 0;
 	pthread_mutex_destroy(&df->refs_mutex);
 }
 
@@ -55,6 +57,14 @@ static void ws_dframe_release(struct ws_dframes *df)
 	}
 }
 
+void *reader_main(void *arg)
+{
+}
+
+void *writer_main(void *arg)
+{
+}
+
 struct conn_struct {
 	struct conn_struct *next;
 	struct conn_struct *prev;
@@ -65,6 +75,9 @@ struct conn_struct {
 
 	pthread_t reader_tid;
 	pthread_t writer_tid;
+
+	int refs;
+	pthread_mutex_t refs_mutex;
 };
 
 static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *ctube)
@@ -75,6 +88,9 @@ static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *c
 
 	conn->fd = fd;
 	conn->ctube = ctube;
+
+	conn->refs = 0;
+	pthread_mutex_init(&conn->refs_mutex, NULL);
 }
 
 static void conn_struct_destroy(struct conn_struct *conn)
@@ -85,6 +101,9 @@ static void conn_struct_destroy(struct conn_struct *conn)
 
 	conn->fd = -1;
 	conn->ctube = NULL;
+
+	conn->refs = 0;
+	pthread_mutex_destroy(&conn->refs_mutex);
 }
 
 struct conn_list {
@@ -95,8 +114,8 @@ struct conn_list {
 
 static int conn_list_init(struct conn_list *clist)
 {
-	conn_struct_init(&clist->head, NULL);
-	conn_struct_init(&clist->tail, NULL);
+	conn_struct_init(&clist->head, -1, NULL);
+	conn_struct_init(&clist->tail, -1, NULL);
 	clist->head.next = &clist->tail;
 	clist->tail.prev = &clist->head;
 }
@@ -143,6 +162,27 @@ static void conn_list_remove(struct conn_struct *conn)
 	pthread_mutex_unlock(&a->list_mutex);
 }
 
+static void conn_struct_acquire(struct conn_struct *conn)
+{
+	pthread_mutex_lock(&conn->refs_mutex);
+	conn->refs++;
+	pthread_mutex_unlock(&conn->refs_mutex);
+}
+
+static void conn_struct_release(struct conn_struct *conn)
+{
+	pthread_mutex_lock(&conn->refs_mutex);
+	conn->refs--;
+	if (conn->refs == 0) {
+		conn_list_remove(conn);
+		pthread_mutex_unlock(&conn->refs_mutex);
+
+	} else {
+		pthread_mutex_unlock(&conn->refs_mutex);
+	}
+}
+
+
 static int bind_server(int server_sock, int port) {
 	struct sockaddr_in sa;
 	sa.sin_family = AF_INET;
@@ -168,7 +208,7 @@ static void *serv_main(void *arg)
 
 	/* create server socket */
 	int server_sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_sock == -1) {
+	if (server_sock < 0) {
 		perror(NULL);
 		goto err_nosock;
 	}
@@ -176,19 +216,19 @@ static void *serv_main(void *arg)
 
 	int yes = 1;
 	if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &yes,
-		   sizeof(yes)) == -1) {
+		   sizeof(yes)) < 0) {
 		perror(NULL);
 		goto out_nopipe;
 	}
 
 	/* set server socket address/port */
-	if (bind_server(server_sock, ctube->port) == -1) {
+	if (bind_server(server_sock, ctube->port) < 0) {
 		perror(NULL);
 		goto out_nopipe;
 	}
 
 	/* set listening */
-	if (listen(server_sock, 1) == -1) {
+	if (listen(server_sock, 1) < 0) {
 		perror(NULL);
 		goto out_nopipe;
 	}
