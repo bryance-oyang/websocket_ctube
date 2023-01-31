@@ -40,6 +40,8 @@
         "unordered_map": "c",
         "unordered_set": "c",
         "algorithm": "c",
-        "sstream": "c"
+        "sstream": "c",
+        "condition_variable": "c",
+        "mutex": "c"
     }
 }

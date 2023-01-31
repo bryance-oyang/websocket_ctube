@@ -9,7 +9,7 @@ static const uint32_t b64_mask = 63;
 
 static void init_b64_encode_table()
 {
-	if (__atomic_exchange_n(&b64_encode_inited, (int)1, 0))
+	if (__atomic_exchange_n(&b64_encode_inited, (int)1, __ATOMIC_SEQ_CST))
 		return;
 
 	for (int i = 0; i < 26; i++) {
