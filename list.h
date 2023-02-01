@@ -7,7 +7,6 @@
 struct list_node {
 	struct list_node *prev;
 	struct list_node *next;
-	pthread_mutex_t mod_mutex;
 	pthread_mutex_t link_mutex;
 };
 
@@ -15,28 +14,23 @@ static int list_node_init(struct list_node *node)
 {
 	node->prev = NULL;
 	node->next = NULL;
-	pthread_mutex_init(&node->mod_mutex, NULL);
 	pthread_mutex_init(&node->link_mutex, NULL);
+
 	return 0;
 }
 
-/** unlink first before destroying; you should not destroy a linked node */
 static void list_node_destroy(struct list_node *node)
 {
 	node->prev = NULL;
 	node->next = NULL;
-	pthread_mutex_destroy(&node->mod_mutex);
 	pthread_mutex_destroy(&node->link_mutex);
 }
 
-/** do nothing if node already unlinked */
 static void list_node_unlink(struct list_node *node)
 {
-	pthread_mutex_lock(&node->mod_mutex);
 	struct list_node *a = node->prev;
 	struct list_node *b = node;
 	struct list_node *c = node->next;
-	if (a == NULL || c == NULL)
 
 	pthread_mutex_lock(&a->link_mutex);
 	pthread_mutex_lock(&b->link_mutex);
@@ -68,11 +62,10 @@ static int list_init(struct list *l)
 
 static void list_destroy(struct list *l)
 {
-	list_node_destroy(l->head);
-	list_node_destroy(l->tail);
+	list_node_destroy(&l->head);
+	list_node_destroy(&l->tail);
 }
 
-/** do nothing if list already linked */
 static void _list_link(struct list_node *a, struct list_node *b, struct list_node *c)
 {
 	pthread_mutex_lock(&a->link_mutex);
@@ -89,7 +82,34 @@ static void _list_link(struct list_node *a, struct list_node *b, struct list_nod
 
 static void list_push_front(struct list *l, struct list_node *node)
 {
+	_list_link(&l->head, node, l->head.next);
+}
 
+static struct list_node *list_pop_front(struct list *l)
+{
+	struct list_node *node = l->head.next;
+	if (node == &l->tail) {
+		return NULL;
+	}
+
+	list_node_unlink(node);
+	return node;
+}
+
+static void list_push_back(struct list *l, struct list_node *node)
+{
+	_list_link(l->tail.prev, node, &l->tail);
+}
+
+static struct list_node *list_pop_back(struct list *l)
+{
+	struct list_node *node = l->tail.prev;
+	if (node == &l->head) {
+		return NULL;
+	}
+
+	list_node_unlink(node);
+	return node;
 }
 
 #endif /* LIST_H */
