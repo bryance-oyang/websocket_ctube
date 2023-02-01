@@ -49,9 +49,25 @@ static void serve_forever(struct ws_ctube *ctube)
 	}
 }
 
+static void _server_init_fail(void *arg)
+{
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	pthread_mutex_lock(&ctube->server_init_mutex);
+	ctube->server_inited = -1;
+	pthread_cond_broadcast(&ctube->server_init_cond);
+	pthread_mutex_unlock(&ctube->server_init_mutex);
+}
+
+static void _close_server_sock(void *arg)
+{
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	close(ctube->server_sock);
+}
+
 static void *server_main(void *arg)
 {
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	pthread_cleanup_push(_server_init_fail, ctube);
 
 	/* create server socket */
 	int server_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -60,6 +76,7 @@ static void *server_main(void *arg)
 		goto err_nosock;
 	}
 	ctube->server_sock = server_sock;
+	pthread_cleanup_push(_close_server_sock, ctube)
 
 	int yes = 1;
 	if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &yes,
@@ -89,13 +106,24 @@ static void *server_main(void *arg)
 
 	/* code doesn't get here unless error */
 err:
-	close(server_sock);
+	pthread_cleanup_pop(1);
 err_nosock:
-	pthread_mutex_lock(&ctube->server_init_mutex);
-	ctube->server_inited = -1;
-	pthread_cond_broadcast(&ctube->server_init_cond);
-	pthread_mutex_unlock(&ctube->server_init_mutex);
+	pthread_cleanup_pop(1);
 	return NULL;
+}
+
+static void _cancel_framer(void *arg)
+{
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	pthread_cancel(ctube->framer_tid);
+	pthread_join(ctube->framer_tid, NULL);
+}
+
+static void _cancel_handler(void *arg)
+{
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	pthread_cancel(ctube->handler_tid);
+	pthread_join(ctube->handler_tid, NULL);
 }
 
 static int ws_ctube_start(struct ws_ctube *ctube)
@@ -104,10 +132,12 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 		fprintf(stderr, "ws_ctube_init(): create framer failed\n");
 		goto err_noframer;
 	}
+	pthread_cleanup_push(_cancel_framer, ctube);
 	if (pthread_create(&ctube->handler_tid, NULL, handler_main, (void *)ctube) != 0) {
 		fprintf(stderr, "ws_ctube_init(): create handler failed\n");
 		goto err_nohandler;
 	}
+	pthread_cleanup_push(_cancel_handler, ctube);
 	if (pthread_create(&ctube->server_tid, NULL, server_main, (void *)ctube) != 0) {
 		fprintf(stderr, "ws_ctube_init(): create server failed\n");
 		goto err_noserver;
@@ -127,11 +157,9 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 	return 0;
 
 err_noserver:
-	pthread_cancel(ctube->handler_tid);
-	pthread_join(ctube->handler_tid, NULL);
+	pthread_cleanup_pop(1);
 err_nohandler:
-	pthread_cancel(ctube->framer_tid);
-	pthread_join(ctube->framer_tid, NULL);
+	pthread_cleanup_pop(1);
 err_noframer:
 	return -1;
 }
@@ -142,9 +170,9 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_cancel(ctube->handler_tid);
 	pthread_cancel(ctube->server_tid);
 
-	pthread_join(ctube->framer_tid);
-	pthread_join(ctube->handler_tid);
-	pthread_join(ctube->server_tid);
+	pthread_join(ctube->framer_tid, NULL);
+	pthread_join(ctube->handler_tid, NULL);
+	pthread_join(ctube->server_tid, NULL);
 }
 
 int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_ms)
