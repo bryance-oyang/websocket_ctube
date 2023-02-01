@@ -28,6 +28,7 @@ struct ws_ctube {
 	pthread_cond_t dframes_cond;
 
 	pthread_t framer_tid;
+	pthread_t handler_tid;
 	pthread_t server_tid;
 
 	int server_inited;

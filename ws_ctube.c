@@ -8,54 +8,14 @@
 #include <string.h>
 #include <signal.h>
 
-#include "ws_ctube.h"
 #include "ws_base.h"
+#include "ws_ctube.h"
+#include "ws_ctube_struct.h"
 
 #define WS_CTUBE_DEBUG 1
 #define WS_CTUBE_BUFLEN 4096
 
 typedef void (*cleanup_f)(void *);
-
-static int ws_dframe_init(struct ws_dframes *df)
-{
-	df->frames = NULL;
-	df->frames_size = 0;
-
-	df->refs = 0;
-	pthread_mutex_init(&df->refs_mutex, NULL);
-}
-
-static void ws_dframe_destroy(struct ws_dframes *df)
-{
-	if (df->frames != NULL) {
-		free(df->frames);
-		df->frames = NULL;
-	}
-	df->frames_size = 0;
-
-	df->refs = 0;
-	pthread_mutex_destroy(&df->refs_mutex);
-}
-
-static void ws_dframe_acquire(struct ws_dframes *df)
-{
-	pthread_mutex_lock(&df->refs_mutex);
-	df->refs++;
-	pthread_mutex_unlock(&df->refs_mutex);
-}
-
-static void ws_dframe_release(struct ws_dframes *df)
-{
-	pthread_mutex_lock(&df->refs_mutex);
-	df->refs--;
-	if (df->refs == 0) {
-		pthread_mutex_unlock(&df->refs_mutex);
-		ws_dframe_destroy(df);
-		free(df);
-	} else {
-		pthread_mutex_unlock(&df->refs_mutex);
-	}
-}
 
 void *reader_main(void *arg)
 {
@@ -65,123 +25,9 @@ void *writer_main(void *arg)
 {
 }
 
-struct conn_struct {
-	struct conn_struct *next;
-	struct conn_struct *prev;
-	pthread_mutex_t list_mutex;
-
-	int fd;
-	struct ws_ctube *ctube;
-
-	pthread_t reader_tid;
-	pthread_t writer_tid;
-
-	int refs;
-	pthread_mutex_t refs_mutex;
-};
-
-static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *ctube)
+static void *handler_main(void *arg)
 {
-	conn->next = NULL;
-	conn->prev = NULL;
-	pthread_mutex_init(&conn->list_mutex, NULL);
-
-	conn->fd = fd;
-	conn->ctube = ctube;
-
-	conn->refs = 0;
-	pthread_mutex_init(&conn->refs_mutex, NULL);
 }
-
-static void conn_struct_destroy(struct conn_struct *conn)
-{
-	conn->next = NULL;
-	conn->prev = NULL;
-	pthread_mutex_destroy(&conn->list_mutex);
-
-	conn->fd = -1;
-	conn->ctube = NULL;
-
-	conn->refs = 0;
-	pthread_mutex_destroy(&conn->refs_mutex);
-}
-
-struct conn_list {
-	/* sentinels */
-	struct conn_struct head;
-	struct conn_struct tail;
-};
-
-static int conn_list_init(struct conn_list *clist)
-{
-	conn_struct_init(&clist->head, -1, NULL);
-	conn_struct_init(&clist->tail, -1, NULL);
-	clist->head.next = &clist->tail;
-	clist->tail.prev = &clist->head;
-}
-
-static void conn_list_destroy(struct conn_list *clist)
-{
-	conn_struct_destroy(&clist->head);
-	conn_struct_destroy(&clist->tail);
-}
-
-static void conn_list_add(struct conn_list *clist, struct conn_struct *conn)
-{
-	struct conn_struct *a = &clist->head;
-	struct conn_struct *b = conn;
-	struct conn_struct *c = clist->head.next;
-
-	pthread_mutex_lock(&a->list_mutex);
-	pthread_mutex_lock(&b->list_mutex);
-	pthread_mutex_lock(&c->list_mutex);
-	a->next = b;
-	b->prev = a;
-	b->next = c;
-	c->prev = b;
-	pthread_mutex_unlock(&c->list_mutex);
-	pthread_mutex_unlock(&b->list_mutex);
-	pthread_mutex_unlock(&a->list_mutex);
-}
-
-static void conn_list_remove(struct conn_struct *conn)
-{
-	struct conn_struct *a = conn->prev;
-	struct conn_struct *b = conn;
-	struct conn_struct *c = conn->next;
-
-	pthread_mutex_lock(&a->list_mutex);
-	pthread_mutex_lock(&b->list_mutex);
-	pthread_mutex_lock(&c->list_mutex);
-	a->next = c;
-	b->prev = NULL;
-	b->next = NULL;
-	c->prev = a;
-	pthread_mutex_unlock(&c->list_mutex);
-	pthread_mutex_unlock(&b->list_mutex);
-	pthread_mutex_unlock(&a->list_mutex);
-}
-
-static void conn_struct_acquire(struct conn_struct *conn)
-{
-	pthread_mutex_lock(&conn->refs_mutex);
-	conn->refs++;
-	pthread_mutex_unlock(&conn->refs_mutex);
-}
-
-static void conn_struct_release(struct conn_struct *conn)
-{
-	pthread_mutex_lock(&conn->refs_mutex);
-	conn->refs--;
-	if (conn->refs == 0) {
-		conn_list_remove(conn);
-		pthread_mutex_unlock(&conn->refs_mutex);
-
-	} else {
-		pthread_mutex_unlock(&conn->refs_mutex);
-	}
-}
-
 
 static int bind_server(int server_sock, int port) {
 	struct sockaddr_in sa;
@@ -271,6 +117,11 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_
 		goto err_noframer;
 	}
 
+	if (pthread_create(&ctube->handler_tid, NULL, handler_main, (void *)ctube) != 0) {
+		fprintf(stderr, "ws_ctube_init(): create handler failed\n");
+		goto err_nohandler;
+	}
+
 	if (pthread_create(&ctube->server_tid, NULL, server_main, (void *)ctube) != 0) {
 		fprintf(stderr, "ws_ctube_init(): create server failed\n");
 		goto err_noserver;
@@ -290,6 +141,9 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_
 	return 0;
 
 err_noserver:
+	pthread_cancel(ctube->handler_tid);
+	pthread_join(ctube->handler_tid);
+err_nohandler:
 	pthread_cancel(ctube->framer_tid);
 	pthread_join(ctube->framer_tid);
 err_noframer:
@@ -299,8 +153,11 @@ err_noframer:
 void ws_ctube_destroy(struct ws_ctube *ctube)
 {
 	pthread_cancel(ctube->framer_tid);
+	pthread_cancel(ctube->handler_tid);
 	pthread_cancel(ctube->server_tid);
+
 	pthread_join(ctube->framer_tid);
+	pthread_join(ctube->handler_tid);
 	pthread_join(ctube->server_tid);
 
 	ctube->server_sock = -1;
