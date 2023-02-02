@@ -126,7 +126,7 @@ static void *handler_main(void *arg)
 		while (!ctube->connq_pred) {
 			pthread_cond_wait(&ctube->connq_cond, &ctube->connq_mutex);
 		}
-
+		ctube->connq_pred = 0;
 		handler_process_queue(ctube->connq, &conn_list);
 	}
 	pthread_mutex_unlock(&ctube->connq_mutex);
@@ -154,8 +154,19 @@ static void serve_forever(struct ws_ctube *ctube)
 			perror("serve_forever()");
 			continue;
 		}
+		conn_struct_init(conn, conn_fd, ctube);
 
-
+		/* push new connection onto queue for reader/writer to be created */
+		struct conn_qentry *qentry = conn_qentry_alloc(conn, WS_CONN_CREATE);
+		if (qentry == NULL) {
+			perror("serve_forever()");
+			continue;
+		}
+		list_push_back(ctube->connq, &qentry->lnode);
+		pthread_mutex_lock(&ctube->connq_mutex);
+		ctube->connq_pred = 1;
+		pthread_cond_signal(&ctube->connq_cond);
+		pthread_mutex_unlock(&ctube->connq_mutex);
 	}
 }
 
