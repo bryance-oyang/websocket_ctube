@@ -42,6 +42,7 @@
         "algorithm": "c",
         "sstream": "c",
         "condition_variable": "c",
-        "mutex": "c"
+        "mutex": "c",
+        "exception": "c"
     }
 }

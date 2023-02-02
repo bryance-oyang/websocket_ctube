@@ -29,24 +29,6 @@ static void list_node_destroy(struct list_node *node)
 	pthread_mutex_destroy(&node->mutex);
 }
 
-static void list_node_unlink(struct list_node *node)
-{
-	struct list_node *a = node->prev;
-	struct list_node *b = node;
-	struct list_node *c = node->next;
-
-	pthread_mutex_lock(&a->mutex);
-	pthread_mutex_lock(&b->mutex);
-	pthread_mutex_lock(&c->mutex);
-	a->next = c;
-	b->prev = NULL;
-	b->next = NULL;
-	c->prev = a;
-	pthread_mutex_unlock(&c->mutex);
-	pthread_mutex_unlock(&b->mutex);
-	pthread_mutex_unlock(&a->mutex);
-}
-
 struct list {
 	struct list_node head;
 	struct list_node tail;
@@ -71,36 +53,48 @@ static void list_destroy(struct list *l)
 
 static void _list_link(struct list_node *a, struct list_node *b, struct list_node *c)
 {
-	pthread_mutex_lock(&a->mutex);
-	pthread_mutex_lock(&b->mutex);
-	pthread_mutex_lock(&c->mutex);
 	a->next = b;
 	b->prev = a;
 	b->next = c;
 	c->prev = b;
-	pthread_mutex_unlock(&c->mutex);
-	pthread_mutex_unlock(&b->mutex);
-	pthread_mutex_unlock(&a->mutex);
 }
 
 static void list_push_front(struct list *l, struct list_node *node)
 {
+	pthread_mutex_lock(&l->head.mutex);
+	pthread_mutex_lock(&node->mutex);
+	pthread_mutex_lock(&l->head.next->mutex);
+
 	_list_link(&l->head, node, l->head.next);
+
+	pthread_mutex_unlock(&l->head.next->mutex);
+	pthread_mutex_unlock(&node->mutex);
+	pthread_mutex_unlock(&l->head.mutex);
 }
 
 static struct list_node *list_pop_front(struct list *l)
 {
+	struct list_node
+	pthread_mutex_lock(&l->head.mutex);
 	struct list_node *node = l->head.next;
 	if (node == &l->tail) {
+		pthread_mutex_unlock(&l->head.mutex);
 		return NULL;
 	}
+	pthread_mutex_lock(&node->mutex);
+	pthread_mutex_lock(&node->next->mutex);
 
-	list_node_unlink(node);
+	pthread_mutex_unlock(&node->next->mutex);
+	pthread_mutex_unlock(&node->mutex);
+	pthread_mutex_unlock(&l->head.mutex);
 	return node;
 }
 
 static void list_push_back(struct list *l, struct list_node *node)
 {
+	pthread_mutex_lock(&l->tail.prev->mutex);
+	pthread_mutex_lock(&node->mutex);
+	pthread_mutex_lock(&l->)
 	_list_link(l->tail.prev, node, &l->tail);
 }
 
