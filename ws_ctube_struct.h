@@ -31,9 +31,8 @@ static void dframes_destroy(struct dframes *df)
 	ref_count_destroy(&df->refc);
 }
 
-static void dframes_free(struct ref_count *refc)
+static void dframes_free(struct dframes *df)
 {
-	struct dframes *df = container_of(refc, struct dframes, refc);
 	dframes_destroy(df);
 	free(df);
 }
@@ -67,9 +66,8 @@ static void conn_struct_destroy(struct conn_struct *conn)
 	list_node_destroy(&conn->lnode);
 }
 
-static void conn_struct_free(struct ref_count *refc)
+static void conn_struct_free(struct conn_struct *conn)
 {
-	struct conn_struct *conn = container_of(refc, struct conn_struct, refc);
 	conn_struct_destroy(conn);
 	free(conn);
 }
@@ -92,7 +90,7 @@ static struct conn_qentry *conn_qentry_alloc(struct conn_struct *conn, enum qact
 		return NULL;
 	}
 
-	ref_count_acquire(&conn->refc);
+	ref_count_acquire(conn, refc);
 	qentry->conn = conn;
 	qentry->act = act;
 	list_node_init(&qentry->lnode);
@@ -100,7 +98,7 @@ static struct conn_qentry *conn_qentry_alloc(struct conn_struct *conn, enum qact
 
 static void conn_qentry_free(struct conn_qentry *qentry)
 {
-	ref_count_release(&qentry->conn, conn_struct_free);
+	ref_count_release(qentry->conn, refc, conn_struct_free);
 	qentry->conn = NULL;
 	list_node_destroy(&qentry->lnode);
 

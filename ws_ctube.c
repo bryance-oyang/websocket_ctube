@@ -68,7 +68,7 @@ static void conn_struct_stop(struct conn_struct *conn)
 
 static void _conn_list_add(struct list *conn_list, struct conn_struct *conn)
 {
-	ref_count_acquire(&conn->refc);
+	ref_count_acquire(conn, refc);
 	list_push_back(conn_list, &conn->lnode);
 }
 
@@ -76,7 +76,7 @@ static void _conn_list_remove(struct list *conn_list, struct conn_struct *conn)
 {
 	(void)conn_list;
 	list_node_unlink(&conn->lnode);
-	ref_count_release(&conn->refc, conn_struct_free);
+	ref_count_release(conn, refc, conn_struct_free);
 }
 
 static void handler_process_queue(struct list *connq, struct list *conn_list)
@@ -109,7 +109,7 @@ static void _cleanup_conn_list(void *arg)
 
 	list_for_each_entry(conn_list, node, conn, lnode) {
 		conn_struct_stop(conn);
-		ref_count_release(&conn->refc, conn_struct_free);
+		ref_count_release(conn, refc, conn_struct_free);
 	}
 }
 
@@ -148,6 +148,14 @@ static void serve_forever(struct ws_ctube *ctube)
 	int server_sock = ctube->server_sock;
 	for (;;) {
 		int conn_fd = accept(server_sock, NULL, NULL);
+
+		struct conn_struct *conn = malloc(sizeof(*conn));
+		if (conn == NULL) {
+			perror("serve_forever()");
+			continue;
+		}
+
+
 	}
 }
 
