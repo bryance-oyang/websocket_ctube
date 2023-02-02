@@ -17,6 +17,11 @@
 
 typedef void (*cleanup_f)(void *);
 
+static void cleanup_unlock_mutex(void *mutex)
+{
+	pthread_mutex_unlock((pthread_mutex_t *)mutex);
+}
+
 static void *reader_main(void *arg)
 {
 	return NULL;
@@ -122,13 +127,15 @@ static void *handler_main(void *arg)
 	pthread_cleanup_push(_cleanup_conn_list, &conn_list);
 
 	pthread_mutex_lock(&ctube->connq_mutex);
-	for (;;) {
-		while (!ctube->connq_pred) {
-			pthread_cond_wait(&ctube->connq_cond, &ctube->connq_mutex);
+	pthread_cleanup_push(cleanup_unlock_mutex, &ctube->connq_mutex) {
+		for (;;) {
+			while (!ctube->connq_pred) {
+				pthread_cond_wait(&ctube->connq_cond, &ctube->connq_mutex);
+			}
+			ctube->connq_pred = 0;
+			handler_process_queue(ctube->connq, &conn_list);
 		}
-		ctube->connq_pred = 0;
-		handler_process_queue(ctube->connq, &conn_list);
-	}
+	} pthread_cleanup_pop(0);
 	pthread_mutex_unlock(&ctube->connq_mutex);
 
 	pthread_cleanup_pop(1);
@@ -315,7 +322,10 @@ void _ws_ctube_destroy_nostop(struct ws_ctube *ctube)
 	ctube->timeout.tv_sec = 0;
 	ctube->timeout.tv_nsec = 0;
 
-	ctube->data = NULL;
+	if (ctube->data != NULL) {
+		free(ctube->data);
+		ctube->data = NULL;
+	}
 	ctube->data_size = 0;
 	pthread_mutex_destroy(&ctube->data_mutex);
 	pthread_cond_destroy(&ctube->data_cond);
@@ -384,6 +394,9 @@ void ws_ctube_destroy(struct ws_ctube *ctube)
 int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
 {
 	if (pthread_mutex_trylock(&ctube->data_mutex) == 0) {
+		if (ctube->data != NULL) {
+			free(ctube->data);
+		}
 		ctube->data = malloc(data_size);
 		if (ctube->data == NULL) {
 			perror("ws_ctube_broadcast()");

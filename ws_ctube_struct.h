@@ -55,6 +55,7 @@ static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *c
 
 	ref_count_init(&conn->refc);
 	list_node_init(&conn->lnode);
+	return 0;
 }
 
 static void conn_struct_destroy(struct conn_struct *conn)
@@ -94,6 +95,8 @@ static struct conn_qentry *conn_qentry_alloc(struct conn_struct *conn, enum qact
 	qentry->conn = conn;
 	qentry->act = act;
 	list_node_init(&qentry->lnode);
+
+	return qentry;
 }
 
 static void conn_qentry_free(struct conn_qentry *qentry)
