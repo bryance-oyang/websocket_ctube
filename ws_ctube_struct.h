@@ -7,45 +7,35 @@
 #include "list.h"
 #include "ws_ctube.h"
 
-static int ws_dframe_init(struct ws_dframes *df)
+struct dframes {
+	char *frames;
+	size_t frames_size;
+	struct ref_count refc;
+};
+
+static int dframes_init(struct dframes *df)
 {
 	df->frames = NULL;
 	df->frames_size = 0;
-
-	df->refs = 0;
-	pthread_mutex_init(&df->refs_mutex, NULL);
+	ref_count_init(&df->refc);
+	return 0;
 }
 
-static void ws_dframe_destroy(struct ws_dframes *df)
+static void dframes_destroy(struct dframes *df)
 {
 	if (df->frames != NULL) {
 		free(df->frames);
 		df->frames = NULL;
 	}
 	df->frames_size = 0;
-
-	df->refs = 0;
-	pthread_mutex_destroy(&df->refs_mutex);
+	ref_count_destroy(&df->refc);
 }
 
-static void ws_dframe_acquire(struct ws_dframes *df)
+static void dframes_free(struct ref_count *refc)
 {
-	pthread_mutex_lock(&df->refs_mutex);
-	df->refs++;
-	pthread_mutex_unlock(&df->refs_mutex);
-}
-
-static void ws_dframe_release(struct ws_dframes *df)
-{
-	pthread_mutex_lock(&df->refs_mutex);
-	df->refs--;
-	if (df->refs == 0) {
-		pthread_mutex_unlock(&df->refs_mutex);
-		ws_dframe_destroy(df);
-		free(df);
-	} else {
-		pthread_mutex_unlock(&df->refs_mutex);
-	}
+	struct dframes *df = container_of(refc, struct dframes, refc);
+	dframes_destroy(df);
+	free(df);
 }
 
 struct conn_struct {
@@ -75,6 +65,13 @@ static void conn_struct_destroy(struct conn_struct *conn)
 
 	ref_count_destroy(&conn->refc);
 	list_node_destroy(&conn->lnode);
+}
+
+static void conn_struct_free(struct ref_count *refc)
+{
+	struct conn_struct *conn = container_of(refc, struct conn_struct, refc);
+	conn_struct_destroy(conn);
+	free(conn);
 }
 
 enum qaction {

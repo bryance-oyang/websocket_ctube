@@ -4,14 +4,8 @@
 #include <pthread.h>
 #include <time.h>
 
-struct ws_dframes {
-	char *frames;
-	size_t frames_size;
-
-	int refs;
-	pthread_mutex_t refs_mutex;
-};
-
+struct dframes;
+struct list;
 struct ws_ctube {
 	int server_sock;
 	int port;
@@ -23,9 +17,12 @@ struct ws_ctube {
 	pthread_mutex_t data_mutex;
 	pthread_cond_t data_cond;
 
-	struct ws_dframes *dframes;
+	struct dframes *dframes;
 	pthread_mutex_t dframes_mutex;
 	pthread_cond_t dframes_cond;
+
+	struct list *connq;
+	pthread_cond_t connq_cond;
 
 	pthread_t framer_tid;
 	pthread_t handler_tid;

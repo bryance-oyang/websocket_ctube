@@ -17,20 +17,78 @@
 
 typedef void (*cleanup_f)(void *);
 
-void *reader_main(void *arg)
+static void *reader_main(void *arg)
 {
+	return NULL;
 }
 
-void *writer_main(void *arg)
+static void *writer_main(void *arg)
 {
+	return NULL;
 }
 
 static void *framer_main(void *arg)
 {
+	return NULL;
+}
+
+static void _cancel_reader(void *arg)
+{
+	struct conn_struct *conn = (struct conn_struct *)arg;
+	pthread_cancel(conn->reader_tid);
+	pthread_join(conn->reader_tid, NULL);
+}
+
+static int conn_struct_start(struct conn_struct *conn)
+{
+	if (pthread_create(&conn->reader_tid, NULL, reader_main, (void *)conn) != 0) {
+		fprintf(stderr, "conn_struct_start(): create reader failed\n");
+		goto err_noreader;
+	}
+	pthread_cleanup_push(_cancel_reader, conn);
+	if (pthread_create(&conn->writer_tid, NULL, writer_main, (void *)conn) != 0) {
+		fprintf(stderr, "conn_struct_start(): create writer failed\n");
+		goto err_nowriter;
+	}
+
+err_nowriter:
+	pthread_cleanup_pop(1);
+err_noreader:
+	return -1;
+}
+
+static void conn_struct_stop(struct conn_struct *conn)
+{
+	pthread_cancel(conn->reader_tid);
+	pthread_cancel(conn->writer_tid);
+
+	pthread_join(conn->reader_tid, NULL);
+	pthread_join(conn->writer_tid, NULL);
+}
+
+static void _cleanup_conn_list(void *arg)
+{
+	struct list *conn_list = (struct list *)arg;
+	struct list_node *node;
+	struct conn_struct *conn;
+
+	list_for_each_entry(conn_list, node, conn, lnode) {
+		conn_struct_stop(conn);
+		ref_count_release(&conn->refc, conn_struct_free);
+	}
 }
 
 static void *handler_main(void *arg)
 {
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+
+	struct list conn_list;
+	pthread_cleanup_push(_cleanup_conn_list, &conn_list);
+
+
+
+	pthread_cleanup_pop(1);
+	return NULL;
 }
 
 static int bind_server(int server_sock, int port) {
@@ -129,17 +187,17 @@ static void _cancel_handler(void *arg)
 static int ws_ctube_start(struct ws_ctube *ctube)
 {
 	if (pthread_create(&ctube->framer_tid, NULL, framer_main, (void *)ctube) != 0) {
-		fprintf(stderr, "ws_ctube_init(): create framer failed\n");
+		fprintf(stderr, "ws_ctube_start(): create framer failed\n");
 		goto err_noframer;
 	}
 	pthread_cleanup_push(_cancel_framer, ctube);
 	if (pthread_create(&ctube->handler_tid, NULL, handler_main, (void *)ctube) != 0) {
-		fprintf(stderr, "ws_ctube_init(): create handler failed\n");
+		fprintf(stderr, "ws_ctube_start(): create handler failed\n");
 		goto err_nohandler;
 	}
 	pthread_cleanup_push(_cancel_handler, ctube);
 	if (pthread_create(&ctube->server_tid, NULL, server_main, (void *)ctube) != 0) {
-		fprintf(stderr, "ws_ctube_init(): create server failed\n");
+		fprintf(stderr, "ws_ctube_start(): create server failed\n");
 		goto err_noserver;
 	}
 
@@ -148,7 +206,7 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 		pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout);
 	}
 	if (ctube->server_inited < 0) {
-		fprintf(stderr, "ws_ctube_init(): server failed to init\n");
+		fprintf(stderr, "ws_ctube_start(): server failed to init\n");
 		pthread_mutex_unlock(&ctube->server_init_mutex);
 		goto err_noserver;
 	}
@@ -175,8 +233,42 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_join(ctube->server_tid, NULL);
 }
 
+void _ws_ctube_destroy_nostop(struct ws_ctube *ctube)
+{
+	ctube->server_sock = -1;
+	ctube->port = -1;
+	ctube->conn_limit = -1;
+	ctube->timeout.tv_sec = 0;
+	ctube->timeout.tv_nsec = 0;
+
+	ctube->data = NULL;
+	ctube->data_size = 0;
+	pthread_mutex_destroy(&ctube->data_mutex);
+	pthread_cond_destroy(&ctube->data_cond);
+
+	ctube->dframes = NULL;
+	pthread_mutex_destroy(&ctube->dframes_mutex);
+	pthread_cond_destroy(&ctube->dframes_cond);
+
+	list_destroy(ctube->connq);
+	free(ctube->connq);
+	pthread_cond_destroy(&ctube->connq_cond);
+
+	ctube->server_inited = 0;
+	pthread_mutex_destroy(&ctube->server_init_mutex);
+	pthread_cond_destroy(&ctube->server_init_cond);
+}
+
 int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_ms)
 {
+	ctube->connq = malloc(sizeof(*ctube->connq));
+	if (ctube->connq == NULL) {
+		perror("ws_ctube_init()");
+		return -1;
+	}
+	list_init(ctube->connq);
+	pthread_cond_init(&ctube->connq_cond, NULL);
+
 	ctube->server_sock = -1;
 	ctube->port = port;
 	ctube->conn_limit = conn_limit;
@@ -196,31 +288,18 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_
 	pthread_mutex_init(&ctube->server_init_mutex, NULL);
 	pthread_cond_init(&ctube->server_init_cond, NULL);
 
-	return ws_ctube_start(ctube);
+	if (ws_ctube_start(ctube) == 0) {
+		return 0;
+	} else {
+		_ws_ctube_destroy_nostop(ctube);
+		return -1;
+	}
 }
 
 void ws_ctube_destroy(struct ws_ctube *ctube)
 {
 	ws_ctube_stop(ctube);
-
-	ctube->server_sock = -1;
-	ctube->port = -1;
-	ctube->conn_limit = -1;
-	ctube->timeout.tv_sec = 0;
-	ctube->timeout.tv_nsec = 0;
-
-	ctube->data = NULL;
-	ctube->data_size = 0;
-	pthread_mutex_destroy(&ctube->data_mutex);
-	pthread_cond_destroy(&ctube->data_cond);
-
-	ctube->dframes = NULL;
-	pthread_mutex_destroy(&ctube->dframes_mutex);
-	pthread_cond_destroy(&ctube->dframes_cond);
-
-	ctube->server_inited = 0;
-	pthread_mutex_destroy(&ctube->server_init_mutex);
-	pthread_cond_destroy(&ctube->server_init_cond);
+	_ws_ctube_destroy_nostop(ctube);
 }
 
 int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)

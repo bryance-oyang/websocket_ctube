@@ -9,7 +9,7 @@ int main()
 	struct ws_ctube ctube;
 	void *data;
 	size_t data_size;
-	ws_ctube_init(&ctube, 9999, 10);
+	ws_ctube_init(&ctube, 9999, 10, 100);
 
 	for (int i = 0; i < 20; i++) {
 		data = malloc(4096);

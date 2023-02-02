@@ -4,6 +4,9 @@
 #include "static_assert.h"
 
 /* shamelessly copied from linux kernel source code */
+
+#define __same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
+
 /**
  * container_of - cast a member of a structure out to the containing structure
  * @ptr:	the pointer to the member.
