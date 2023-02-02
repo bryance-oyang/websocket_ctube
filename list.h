@@ -1,3 +1,5 @@
+/** thread-safe doubly linked list */
+
 #ifndef LIST_H
 #define LIST_H
 
@@ -114,7 +116,8 @@ static struct list_node *list_pop_back(struct list *l)
 }
 
 #define list_for_each(list, node) \
-	for (pthread_mutex_lock(&(list)->head.mutex), \
+	for ( \
+	pthread_mutex_lock(&(list)->head.mutex), \
 	node = (list)->head.next, \
 	pthread_mutex_lock(&node->mutex), \
 	pthread_mutex_unlock(&(list)->head.mutex) \
@@ -127,7 +130,8 @@ static struct list_node *list_pop_back(struct list *l)
 	pthread_mutex_unlock(&node->prev->mutex))
 
 #define list_for_each_entry(list, node, entry, member) \
-	for (pthread_mutex_lock(&(list)->head.mutex), \
+	for ( \
+	pthread_mutex_lock(&(list)->head.mutex), \
 	node = (list)->head.next, \
 	pthread_mutex_lock(&node->mutex), \
 	pthread_mutex_unlock(&(list)->head.mutex), \

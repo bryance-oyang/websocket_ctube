@@ -66,6 +66,41 @@ static void conn_struct_stop(struct conn_struct *conn)
 	pthread_join(conn->writer_tid, NULL);
 }
 
+static void _conn_list_add(struct list *conn_list, struct conn_struct *conn)
+{
+	ref_count_acquire(&conn->refc);
+	list_push_back(conn_list, &conn->lnode);
+}
+
+static void _conn_list_remove(struct list *conn_list, struct conn_struct *conn)
+{
+	(void)conn_list;
+	list_node_unlink(&conn->lnode);
+	ref_count_release(&conn->refc, conn_struct_free);
+}
+
+static void handler_process_queue(struct list *connq, struct list *conn_list)
+{
+	struct list_node *node;
+	struct conn_qentry *qentry;
+	struct conn_struct *conn;
+
+	while ((node = list_pop_front(connq)) != NULL) {
+		qentry = container_of(node, typeof(*qentry), lnode);
+		conn = qentry->conn;
+
+		if (qentry->act == WS_CONN_CREATE) {
+			conn_struct_start(conn);
+			_conn_list_add(conn_list, conn);
+		} else if (qentry->act == WS_CONN_DESTROY) {
+			_conn_list_remove(conn_list, conn);
+			conn_struct_stop(conn);
+		}
+
+		conn_qentry_free(qentry);
+	}
+}
+
 static void _cleanup_conn_list(void *arg)
 {
 	struct list *conn_list = (struct list *)arg;
@@ -83,9 +118,18 @@ static void *handler_main(void *arg)
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 
 	struct list conn_list;
+	list_init(&conn_list);
 	pthread_cleanup_push(_cleanup_conn_list, &conn_list);
 
+	pthread_mutex_lock(&ctube->connq_mutex);
+	for (;;) {
+		while (!ctube->connq_pred) {
+			pthread_cond_wait(&ctube->connq_cond, &ctube->connq_mutex);
+		}
 
+		handler_process_queue(ctube->connq, &conn_list);
+	}
+	pthread_mutex_unlock(&ctube->connq_mutex);
 
 	pthread_cleanup_pop(1);
 	return NULL;
@@ -233,6 +277,17 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_join(ctube->server_tid, NULL);
 }
 
+void _ws_ctube_clear_connq(struct list *connq)
+{
+	struct list_node *node;
+	struct conn_qentry *qentry;
+
+	while ((node = list_pop_front(connq)) != NULL) {
+		qentry = container_of(node, typeof(*qentry), lnode);
+		conn_qentry_free(qentry);
+	}
+}
+
 void _ws_ctube_destroy_nostop(struct ws_ctube *ctube)
 {
 	ctube->server_sock = -1;
@@ -250,8 +305,11 @@ void _ws_ctube_destroy_nostop(struct ws_ctube *ctube)
 	pthread_mutex_destroy(&ctube->dframes_mutex);
 	pthread_cond_destroy(&ctube->dframes_cond);
 
+	_ws_ctube_clear_connq(ctube->connq);
 	list_destroy(ctube->connq);
 	free(ctube->connq);
+	ctube->connq_pred = 0;
+	pthread_mutex_destroy(&ctube->connq_mutex);
 	pthread_cond_destroy(&ctube->connq_cond);
 
 	ctube->server_inited = 0;
@@ -267,6 +325,8 @@ int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_
 		return -1;
 	}
 	list_init(ctube->connq);
+	ctube->connq_pred = 0;
+	pthread_mutex_init(&ctube->connq_mutex, NULL);
 	pthread_cond_init(&ctube->connq_cond, NULL);
 
 	ctube->server_sock = -1;

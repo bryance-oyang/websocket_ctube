@@ -75,15 +75,36 @@ static void conn_struct_free(struct ref_count *refc)
 }
 
 enum qaction {
-	CONN_CREATE,
-	CONN_DESTROY
+	WS_CONN_CREATE,
+	WS_CONN_DESTROY
 };
 
 struct conn_qentry {
 	struct conn_struct *conn;
 	enum qaction act;
-
-	struct list_node *lnode;
+	struct list_node lnode;
 };
+
+static struct conn_qentry *conn_qentry_alloc(struct conn_struct *conn, enum qaction act)
+{
+	struct conn_qentry *qentry = malloc(sizeof(*qentry));
+	if (qentry == NULL) {
+		return NULL;
+	}
+
+	ref_count_acquire(&conn->refc);
+	qentry->conn = conn;
+	qentry->act = act;
+	list_node_init(&qentry->lnode);
+}
+
+static void conn_qentry_free(struct conn_qentry *qentry)
+{
+	ref_count_release(&qentry->conn, conn_struct_free);
+	qentry->conn = NULL;
+	list_node_destroy(&qentry->lnode);
+
+	free(qentry);
+}
 
 #endif /* WS_CTUBE_STRUCT_H */

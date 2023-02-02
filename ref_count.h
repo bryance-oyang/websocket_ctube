@@ -1,3 +1,5 @@
+/** thread-safe reference counting */
+
 #ifndef REF_COUNT_H
 #define REF_COUNT_H
 

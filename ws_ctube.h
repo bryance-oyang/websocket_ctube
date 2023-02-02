@@ -22,6 +22,8 @@ struct ws_ctube {
 	pthread_cond_t dframes_cond;
 
 	struct list *connq;
+	int connq_pred;
+	pthread_mutex_t connq_mutex;
 	pthread_cond_t connq_cond;
 
 	pthread_t framer_tid;
