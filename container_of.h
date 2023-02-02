@@ -1,9 +1,9 @@
+/** shamelessly copied from linux kernel source code */
+
 #ifndef CONTAINER_OF_H
 #define CONTAINER_OF_H
 
 #include "static_assert.h"
-
-/* shamelessly copied from linux kernel source code */
 
 #define __same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
 
