@@ -120,24 +120,24 @@ static struct list_node *list_pop_back(struct list *l)
 	pthread_mutex_unlock(&(list)->head.mutex) \
 	; \
 	node != &(list)->tail \
-	|| pthread_mutex_unlock(&node->mutex) \
+	|| (pthread_mutex_unlock(&node->mutex) && 0) \
 	; \
 	node = node->next, \
-	pthread_mutex_lock(&node->mutex) \
+	pthread_mutex_lock(&node->mutex), \
 	pthread_mutex_unlock(&node->prev->mutex))
 
 #define list_for_each_entry(list, node, entry, member) \
 	for (pthread_mutex_lock(&(list)->head.mutex), \
 	node = (list)->head.next, \
 	pthread_mutex_lock(&node->mutex), \
-	pthread_mutex_unlock(&(list)->head.mutex) \
+	pthread_mutex_unlock(&(list)->head.mutex), \
 	entry = container_of(node, typeof(*entry), member) \
 	; \
 	node != &(list)->tail \
-	|| pthread_mutex_unlock(&node->mutex) \
+	|| (pthread_mutex_unlock(&node->mutex) && 0)\
 	; \
 	node = node->next, \
-	pthread_mutex_lock(&node->mutex) \
+	pthread_mutex_lock(&node->mutex), \
 	pthread_mutex_unlock(&node->prev->mutex), \
 	entry = container_of(node, typeof(*entry), member))
 
