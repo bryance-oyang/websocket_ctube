@@ -40,8 +40,14 @@ static void *framer_main(void *arg)
 static void _cancel_reader(void *arg)
 {
 	struct conn_struct *conn = (struct conn_struct *)arg;
+
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	pthread_cancel(conn->reader_tid);
 	pthread_join(conn->reader_tid, NULL);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 static int conn_struct_start(struct conn_struct *conn)
@@ -69,11 +75,16 @@ out_noreader:
 
 static void conn_struct_stop(struct conn_struct *conn)
 {
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	pthread_cancel(conn->reader_tid);
 	pthread_cancel(conn->writer_tid);
 
 	pthread_join(conn->reader_tid, NULL);
 	pthread_join(conn->writer_tid, NULL);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 static void _conn_list_add(struct list *conn_list, struct conn_struct *conn)
@@ -84,18 +95,17 @@ static void _conn_list_add(struct list *conn_list, struct conn_struct *conn)
 
 static void _conn_list_remove(struct list *conn_list, struct conn_struct *conn)
 {
-	(void)conn_list;
-	list_node_unlink(&conn->lnode);
+	list_unlink(conn_list, &conn->lnode);
 	ref_count_release(conn, refc, conn_struct_free);
 }
 
 static void handler_process_queue(struct list *connq, struct list *conn_list)
 {
-	struct list_node *node;
 	struct conn_qentry *qentry;
+	struct list_node *node;
 	struct conn_struct *conn;
 
-	while ((node = list_pop_front(connq)) != NULL) {
+	while ((node = list_lockpop_front(connq)) != NULL) {
 		qentry = container_of(node, typeof(*qentry), lnode);
 		conn = qentry->conn;
 
@@ -106,12 +116,16 @@ static void handler_process_queue(struct list *connq, struct list *conn_list)
 			pthread_mutex_lock(&conn->stopping_mutex);
 			if (!conn->stopping) {
 				conn->stopping = 1;
+				pthread_mutex_unlock(&conn->stopping_mutex);
+
 				_conn_list_remove(conn_list, conn);
 				conn_struct_stop(conn);
+			} else {
+				pthread_mutex_unlock(&conn->stopping_mutex);
 			}
-			pthread_mutex_unlock(&conn->stopping_mutex);
 		}
 
+		pthread_mutex_unlock(&node->mutex);
 		conn_qentry_free(qentry);
 	}
 }
@@ -122,8 +136,17 @@ static void _cleanup_conn_list(void *arg)
 	struct list_node *node;
 	struct conn_struct *conn;
 
-	list_for_each_entry(conn_list, node, conn, lnode) {
-		conn_struct_stop(conn);
+	while ((node = list_lockpop_front(conn_list)) != NULL) {
+		conn = container_of(node, typeof(*conn), lnode);
+
+		pthread_mutex_lock(&conn->stopping_mutex);
+		if (!conn->stopping) {
+			conn->stopping = 1;
+			conn_struct_stop(conn);
+		}
+		pthread_mutex_unlock(&conn->stopping_mutex);
+
+		pthread_mutex_unlock(&node->mutex);
 		ref_count_release(conn, refc, conn_struct_free);
 	}
 }
@@ -255,15 +278,25 @@ out_nosock:
 static void _cancel_framer(void *arg)
 {
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	pthread_cancel(ctube->framer_tid);
 	pthread_join(ctube->framer_tid, NULL);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 static void _cancel_handler(void *arg)
 {
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	pthread_cancel(ctube->handler_tid);
 	pthread_join(ctube->handler_tid, NULL);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 static int ws_ctube_start(struct ws_ctube *ctube)
@@ -314,6 +347,9 @@ out_noframer:
 
 static void ws_ctube_stop(struct ws_ctube *ctube)
 {
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	pthread_cancel(ctube->framer_tid);
 	pthread_cancel(ctube->handler_tid);
 	pthread_cancel(ctube->server_tid);
@@ -321,6 +357,8 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_join(ctube->framer_tid, NULL);
 	pthread_join(ctube->handler_tid, NULL);
 	pthread_join(ctube->server_tid, NULL);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 struct ws_ctube *ws_ctube_open(int port, int conn_limit, int timeout_ms)

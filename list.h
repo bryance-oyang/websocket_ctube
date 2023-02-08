@@ -66,7 +66,16 @@ static void _list_node_unlink(struct list_node *node)
 	node->prev = NULL;
 }
 
-static void list_node_push_front(struct list *l, struct list_node *node)
+static void list_unlink(struct list *l, struct list_node *node)
+{
+	pthread_mutex_lock(&node->mutex);
+	pthread_mutex_lock(&l->mutex);
+	_list_node_unlink(node);
+	pthread_mutex_unlock(&l->mutex);
+	pthread_mutex_unlock(&node->mutex);
+}
+
+static void list_push_front(struct list *l, struct list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
@@ -82,7 +91,7 @@ out:
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static void list_node_push_back(struct list *l, struct list_node *node)
+static void list_push_back(struct list *l, struct list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
@@ -98,7 +107,7 @@ out:
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static struct list_node *list_node_lockpop_front(struct list *l)
+static struct list_node *list_lockpop_front(struct list *l)
 {
 	struct list_node *front;
 
@@ -124,9 +133,10 @@ static struct list_node *list_node_lockpop_front(struct list *l)
 	_list_node_unlink(front);
 	l->len--;
 	pthread_mutex_unlock(&l->mutex);
+	return front;
 }
 
-static struct list_node *list_node_lockpop_back(struct list *l)
+static struct list_node *list_lockpop_back(struct list *l)
 {
 	struct list_node *back;
 
@@ -152,6 +162,7 @@ static struct list_node *list_node_lockpop_back(struct list *l)
 	_list_node_unlink(back);
 	l->len--;
 	pthread_mutex_unlock(&l->mutex);
+	return back;
 }
 
 #define list_for_each(list, node) \
@@ -162,12 +173,12 @@ static struct list_node *list_node_lockpop_back(struct list *l)
 
 #define list_for_each_entry(list, entry, member) \
 	for ( \
-	entry = (list)->head.next != &(list)->head ? \
+	entry = (list)->head.next != &((list)->head) ? \
 	container_of((list)->head.next, typeof(*entry), member) : \
 	NULL; \
 	entry != NULL; \
-	entry = entry->member->next != &(list)->head ? \
-	container_of(entry->member->next, typeof(*entry), member) : \
+	entry = entry->member.next != &((list)->head) ? \
+	container_of(entry->member.next, typeof(*entry), member) : \
 	NULL)
 
 #endif /* LIST_H */
