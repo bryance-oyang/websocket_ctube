@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "ws_base.h"
 #include "crypt.h"
 
 #define WS_DEBUG 0
@@ -67,38 +68,52 @@ static void ws_print_frame(char *prefix, char *frame, int len)
 	fflush(stdout);
 }
 
-int ws_send(int conn, const char *msg, int msg_size)
+/**
+ * ws_mkframe(): make a websocket frame
+ *
+ * @param frame pointer to buffer where frame shall be written
+ * @param msg pointer to data
+ * @param msg_size bytes of message
+ * @param first whether this is the first frame in a sequence
+ *
+ * @return number of bytes of msg contained in frame
+ */
+int ws_mkframe(char *frame, const char *msg, size_t msg_size, int first)
 {
 	int payld_size;
-	const int payld_offset = 2;
-	int frame_len;
+
+	if (msg_size > WS_MAX_PAYLD_SIZE) {
+		frame[0] = first;
+		payld_size = WS_MAX_PAYLD_SIZE;
+	} else {
+		frame[0] = 0b10000000 + first;
+		payld_size = msg_size;
+	}
+
+	frame[1] = payld_size;
+	memcpy(&frame[WS_FRAME_HDR_SIZE], msg, payld_size);
+
+	return payld_size;
+}
+
+int ws_send(int conn, const char *msg, size_t msg_size)
+{
+	int payld_size;
 	char frame[WS_BUFLEN];
 
-	for (int first = 1; msg_size > 0;
-	     msg_size -= payld_size, msg += payld_size, first = 0) {
-		memset(frame, 0, 128);
-
-		if (msg_size > 125) {
-			frame[0] = first;
-			payld_size = 125;
-		} else {
-			frame[0] = 0b10000000 + first;
-			payld_size = msg_size;
-		}
-		frame[1] = payld_size;
-
-		frame_len = payld_offset + payld_size;
-		memcpy(&frame[payld_offset], msg, payld_size);
-		ws_print_frame("ws_send", frame, frame_len);
-
-		if (send_all(conn, frame, frame_len) != 0)
+	for (int first = 1; msg_size > 0; first = 0, msg += payld_size, msg_size -= payld_size) {
+		payld_size = ws_mkframe(frame, msg, msg_size, first);
+		const int frame_len = payld_size + WS_FRAME_HDR_SIZE;
+		ws_print_frame("ws_send()", frame, frame_len);
+		if (send_all(conn, frame, frame_len) != 0) {
 			return -1;
+		}
 	}
 
 	return 0;
 }
 
-int ws_recv(int conn, char *msg, int *msg_size, int max_msg_size)
+int ws_recv(int conn, char *msg, int *msg_size, size_t max_msg_size)
 {
 	(void)conn;
 	(void)msg;

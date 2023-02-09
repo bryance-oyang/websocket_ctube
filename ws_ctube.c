@@ -34,17 +34,13 @@ static void *writer_main(void *arg)
 
 static int dframes_from_ws_data(struct dframes *df, struct ws_data *out_data)
 {
-	int msg_size, payld_size, frame_len;
+	int msg_size, payld_size, frame_size;
 	char *frame, *msg;
 
-	const int payld_offset = 2;
-	const int max_payld_bytes = 125;
+	const int nframes = (out_data->data_size + (WS_MAX_PAYLD_SIZE - 1)) / WS_MAX_PAYLD_SIZE;
+	const int total_frames_size = nframes * WS_FRAME_HDR_SIZE + out_data->data_size;
 
-	/* 2-byte header + data */
-	const int nframes = (out_data->data_size + (max_payld_bytes - 1)) / max_payld_bytes;
-	const int frames_size = nframes * 2 + out_data->data_size;
-
-	if (dframes_resize(df, frames_size) != 0) {
+	if (dframes_resize(df, total_frames_size) != 0) {
 		return -1;
 	}
 
@@ -52,20 +48,12 @@ static int dframes_from_ws_data(struct dframes *df, struct ws_data *out_data)
 	msg = out_data->data;
 	msg_size = out_data->data_size;
 	for (int first = 1; msg_size > 0;
-		frame += frame_len, msg_size -= payld_size, msg += payld_size, first = 0) {
-
-		if (msg_size > max_payld_bytes) {
-			frame[0] = first;
-			payld_size = max_payld_bytes;
-		} else {
-			frame[0] = 0b10000000 + first;
-			payld_size = msg_size;
-		}
-		frame[1] = payld_size;
-
-		frame_len = payld_offset + payld_size;
-		memcpy(&frame[payld_offset], msg, payld_size);
+	first = 0, frame += frame_size, msg += payld_size, msg_size -= payld_size) {
+		payld_size = ws_mkframe(frame, msg, msg_size, first);
+		frame_size = payld_size + WS_FRAME_HDR_SIZE;
 	}
+
+	return 0;
 }
 
 static int frame_out_data(struct ws_ctube *ctube)
@@ -90,11 +78,11 @@ static int frame_out_data(struct ws_ctube *ctube)
 		goto out_nodf_data;
 	}
 
-	ref_count_acquire(df, refc);
 	pthread_mutex_lock(&ctube->dframes_mutex);
 	if (ctube->dframes != NULL) {
 		ref_count_release(ctube->dframes, refc, dframes_free);
 	}
+	ref_count_acquire(df, refc);
 	ctube->dframes = df;
 	pthread_cond_broadcast(&ctube->dframes_cond);
 	pthread_mutex_unlock(&ctube->dframes_mutex);
@@ -109,20 +97,14 @@ out_nodf:
 
 static void *framer_main(void *arg)
 {
-	int oldstate;
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 
-	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 	for (;;) {
 		pthread_mutex_lock(&ctube->out_data_mutex);
-
 		pthread_cleanup_push(cleanup_unlock_mutex, &ctube->out_data_mutex);
-		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 		while (!ctube->out_data_pred) {
 			pthread_cond_wait(&ctube->out_data_cond, &ctube->out_data_mutex);
 		}
-		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
-		pthread_cleanup_pop(0); /* cleanup_unlock_mutex */
 
 		ctube->out_data_pred = 0;
 		if (frame_out_data(ctube) != 0) {
@@ -130,6 +112,7 @@ static void *framer_main(void *arg)
 			fflush(stderr);
 		}
 
+		pthread_cleanup_pop(0); /* cleanup_unlock_mutex */
 		pthread_mutex_unlock(&ctube->out_data_mutex);
 	}
 

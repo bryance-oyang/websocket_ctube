@@ -15,7 +15,7 @@ int main()
 	for (int i = 0; i < 10; i++) {
 		data = malloc(4096);
 		data_size = snprintf(data, 4096, "hello, world! %d\n", i);
-		ws_ctube_try_bcast(ctube, data, data_size);
+		ws_ctube_broadcast(ctube, data, data_size);
 		free(data);
 		sleep(1);
 	}
