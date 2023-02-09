@@ -39,11 +39,10 @@ static void *framer_main(void *arg)
 
 static void _cancel_reader(void *arg)
 {
-	struct conn_struct *conn = (struct conn_struct *)arg;
-
 	int oldstate;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
+	struct conn_struct *conn = (struct conn_struct *)arg;
 	pthread_cancel(conn->reader_tid);
 	pthread_join(conn->reader_tid, NULL);
 
@@ -132,6 +131,9 @@ static void handler_process_queue(struct list *connq, struct list *conn_list)
 
 static void _cleanup_conn_list(void *arg)
 {
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	struct list *conn_list = (struct list *)arg;
 	struct list_node *node;
 	struct conn_struct *conn;
@@ -149,6 +151,8 @@ static void _cleanup_conn_list(void *arg)
 		pthread_mutex_unlock(&node->mutex);
 		ref_count_release(conn, refc, conn_struct_free);
 	}
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 static void *handler_main(void *arg)
@@ -166,7 +170,8 @@ static void *handler_main(void *arg)
 			pthread_cond_wait(&ctube->connq_cond, &ctube->connq_mutex);
 		}
 		ctube->connq_pred = 0;
-		pthread_cleanup_pop(1);
+		pthread_mutex_unlock(&ctube->connq_mutex);
+		pthread_cleanup_pop(0); /* cleanup_unlock_mutex */
 
 		handler_process_queue(&ctube->connq, &conn_list);
 	}
@@ -185,9 +190,14 @@ static int bind_server(int server_sock, int port) {
 
 static void serve_forever(struct ws_ctube *ctube)
 {
+	int oldstate;
 	int server_sock = ctube->server_sock;
+
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 	for (;;) {
+		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 		int conn_fd = accept(server_sock, NULL, NULL);
+		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 		struct conn_struct *conn = malloc(sizeof(*conn));
 		if (conn == NULL) {
@@ -214,17 +224,27 @@ static void serve_forever(struct ws_ctube *ctube)
 
 static void _server_init_fail(void *arg)
 {
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	ctube->server_inited = -1;
 	pthread_cond_broadcast(&ctube->server_init_cond);
 	pthread_mutex_unlock(&ctube->server_init_mutex);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 static void _close_server_sock(void *arg)
 {
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	close(ctube->server_sock);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
 static void *server_main(void *arg)
@@ -269,18 +289,18 @@ static void *server_main(void *arg)
 
 	/* code doesn't get here unless error */
 out_err:
-	pthread_cleanup_pop(1);
+	pthread_cleanup_pop(1); /* _close_server_sock */
 out_nosock:
-	pthread_cleanup_pop(1);
+	pthread_cleanup_pop(1); /* _server_init_fail */
 	return NULL;
 }
 
 static void _cancel_framer(void *arg)
 {
-	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	int oldstate;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	pthread_cancel(ctube->framer_tid);
 	pthread_join(ctube->framer_tid, NULL);
 
@@ -289,10 +309,10 @@ static void _cancel_framer(void *arg)
 
 static void _cancel_handler(void *arg)
 {
-	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	int oldstate;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	pthread_cancel(ctube->handler_tid);
 	pthread_join(ctube->handler_tid, NULL);
 
@@ -400,21 +420,50 @@ void ws_ctube_close(struct ws_ctube *ctube)
 {
 	ws_ctube_stop(ctube);
 	ws_ctube_destroy(ctube);
+	free(ctube);
 }
 
-int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
+int ws_ctube_try_bcast(struct ws_ctube *ctube, void *data, size_t data_size)
 {
 	int retval = 0;
 
-	if (pthread_mutex_trylock(&ctube->data_mutex) != 0) {
+	if (pthread_mutex_trylock(&ctube->out_data_mutex) != 0) {
 		retval = -1;
 		goto out_nolock;
 	}
-	pthread_cleanup_push(cleanup_unlock_mutex, &ctube->data_mutex);
+	pthread_cleanup_push(cleanup_unlock_mutex, &ctube->out_data_mutex);
 
+	if (ctube->out_data_list.len > 0) {
+		retval = -1;
+		goto out_listfull;
+	}
 
+	struct ws_data *out_data = malloc(sizeof(*out_data));
+	if (out_data == NULL) {
+		retval = -1;
+		goto out_nodata;
+	}
+	pthread_cleanup_push(free, out_data);
+
+	if (ws_data_init(out_data, data_size) != 0) {
+		retval = -1;
+		goto out_nodatainit;
+	}
+	if (ws_data_cp(out_data, data, data_size) != 0) {
+		retval = -1;
+		goto out_nodatacp;
+	}
+
+	list_push_back(&ctube->out_data_list, &out_data->lnode);
+
+	pthread_mutex_unlock(&ctube->out_data_mutex);
+
+out_nodatacp:
+out_nodatainit:
+	pthread_cleanup_pop(retval); /* free */
 out_nodata:
-	pthread_cleanup_pop(1); /* cleanup_unlock_mutex */
+out_listfull:
+	pthread_cleanup_pop(retval); /* cleanup_unlock_mutex */
 out_nolock:
 	return retval;
 }

@@ -66,7 +66,7 @@ static void _list_node_unlink(struct list_node *node)
 	node->prev = NULL;
 }
 
-static void list_unlink(struct list *l, struct list_node *node)
+static inline void list_unlink(struct list *l, struct list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
@@ -75,7 +75,7 @@ static void list_unlink(struct list *l, struct list_node *node)
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static void list_push_front(struct list *l, struct list_node *node)
+static inline void list_push_front(struct list *l, struct list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
@@ -91,7 +91,7 @@ out:
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static void list_push_back(struct list *l, struct list_node *node)
+static inline void list_push_back(struct list *l, struct list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
@@ -99,7 +99,7 @@ static void list_push_back(struct list *l, struct list_node *node)
 	if (node->next != NULL || node->prev != NULL) {
 		goto out;
 	}
-	_list_add_after(&l->head.prev, node);
+	_list_add_after(l->head.prev, node);
 	l->len++;
 
 out:
@@ -107,7 +107,7 @@ out:
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static struct list_node *list_lockpop_front(struct list *l)
+static inline struct list_node *list_lockpop_front(struct list *l)
 {
 	struct list_node *front;
 
@@ -136,7 +136,7 @@ static struct list_node *list_lockpop_front(struct list *l)
 	return front;
 }
 
-static struct list_node *list_lockpop_back(struct list *l)
+static inline struct list_node *list_lockpop_back(struct list *l)
 {
 	struct list_node *back;
 

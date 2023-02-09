@@ -43,6 +43,11 @@
         "sstream": "c",
         "condition_variable": "c",
         "mutex": "c",
-        "exception": "c"
+        "exception": "c",
+        "iomanip": "c",
+        "limits": "c",
+        "ostream": "c",
+        "stop_token": "c",
+        "streambuf": "c"
     }
 }
