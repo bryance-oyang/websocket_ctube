@@ -1,3 +1,7 @@
+/** @file
+ * @brief compile time assertion
+ */
+
 #ifndef STATIC_ASSERT_H
 #define STATIC_ASSERT_H
 

@@ -1,10 +1,11 @@
+/** @file
+ * @brief crux
+ */
+
 #include <unistd.h>
-#include <poll.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <signal.h>
 
 #include "socket.h"
 #include "ws_base.h"
@@ -19,6 +20,36 @@ typedef void (*cleanup_f)(void *);
 static void _cleanup_unlock_mutex(void *mutex)
 {
 	pthread_mutex_unlock((pthread_mutex_t *)mutex);
+}
+
+static int _connq_push(struct ws_ctube *ctube, struct conn_struct *conn, enum qaction act)
+{
+	int retval = 0;
+	struct conn_qentry *qentry = malloc(sizeof(*qentry));
+
+	if (qentry == NULL) {
+		retval = -1;
+		goto out_noalloc;
+	}
+	pthread_cleanup_push(free, qentry);
+
+	if (conn_qentry_init(qentry, conn, act) != 0) {
+		retval = -1;
+		goto out_noinit;
+	}
+	pthread_cleanup_push((cleanup_f)conn_qentry_destroy, qentry);
+
+	list_push_back(&ctube->connq, &qentry->lnode);
+	pthread_mutex_lock(&ctube->connq_mutex);
+	ctube->connq_pred = 1;
+	pthread_cond_signal(&ctube->connq_cond);
+	pthread_mutex_unlock(&ctube->connq_mutex);
+
+	pthread_cleanup_pop(retval); /* conn_qentry_destory */
+out_noinit:
+	pthread_cleanup_pop(retval); /* free */
+out_noalloc:
+	return retval;
 }
 
 static void *reader_main(void *arg)
@@ -302,37 +333,47 @@ static void *handler_main(void *arg)
 	return NULL;
 }
 
+static int _serve_new_conn(struct ws_ctube *ctube, int conn_fd)
+{
+	int retval = 0;
+	struct conn_struct *conn = malloc(sizeof(*conn));
+
+	if (conn == NULL) {
+		retval = -1;
+		goto out_noalloc;
+	}
+	pthread_cleanup_push(free, conn);
+
+	if (conn_struct_init(conn, conn_fd, ctube) != 0) {
+		retval = -1;
+		goto out_noinit;
+	}
+	pthread_cleanup_push(conn_struct_destroy, conn);
+
+	if (_connq_push(ctube, conn, WS_CONN_START) != 0) {
+		retval = -1;
+		goto out_nopush;
+	}
+
+out_nopush:
+	pthread_cleanup_pop(retval); /* conn_struct_destroy */
+out_noinit:
+	pthread_cleanup_pop(retval); /* free */
+out_noalloc:
+	return retval;
+}
+
 static void serve_forever(struct ws_ctube *ctube)
 {
 	int oldstate;
 	int server_sock = ctube->server_sock;
 
-	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 	for (;;) {
-		pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 		int conn_fd = accept(server_sock, NULL, NULL);
-		pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
-
-		struct conn_struct *conn = malloc(sizeof(*conn));
-		if (conn == NULL) {
-			perror("serve_forever()");
-			continue;
+		if (_serve_new_conn(ctube, conn_fd) != 0) {
+			fprintf(stderr, "serve_forever(): error");
+			fflush(stderr);
 		}
-		conn_struct_init(conn, conn_fd, ctube);
-
-		/* push new connection onto queue for reader/writer to be created */
-		struct conn_qentry *qentry = malloc(sizeof(*qentry));
-		if (qentry == NULL) {
-			perror("serve_forever()");
-			continue;
-		}
-		conn_qentry_init(qentry, conn, WS_CONN_START);
-
-		list_push_back(&ctube->connq, &qentry->lnode);
-		pthread_mutex_lock(&ctube->connq_mutex);
-		ctube->connq_pred = 1;
-		pthread_cond_signal(&ctube->connq_cond);
-		pthread_mutex_unlock(&ctube->connq_mutex);
 	}
 }
 
@@ -495,6 +536,13 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
+/**
+ * create a ws_ctube that must be closed with ws_ctube_close()
+ *
+ * @param port port for websocket server
+ * @param conn_limit maximum number of connections allowed
+ * @param timeout_ms timeout for handshake operations
+ */
 struct ws_ctube *ws_ctube_open(int port, int conn_limit, int timeout_ms)
 {
 	int err = 0;
@@ -530,6 +578,9 @@ out_noalloc:
 	}
 }
 
+/**
+ * terminate websocket server and cleanup
+ */
 void ws_ctube_close(struct ws_ctube *ctube)
 {
 	ws_ctube_stop(ctube);
@@ -537,6 +588,13 @@ void ws_ctube_close(struct ws_ctube *ctube)
 	free(ctube);
 }
 
+/**
+ * try to send data to all connected websocket clients
+ *
+ * @param ctube the websocket ctube
+ * @param data data to broadcast
+ * @param data_size bytes of data
+ */
 int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
 {
 	int retval = 0;

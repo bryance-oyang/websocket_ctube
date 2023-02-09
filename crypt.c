@@ -1,3 +1,7 @@
+/** @file
+ * @brief crypto functions
+ */
+
 #include <stdint.h>
 #include <openssl/sha.h>
 

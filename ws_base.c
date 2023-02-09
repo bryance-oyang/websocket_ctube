@@ -1,3 +1,7 @@
+/** @file
+ * @brief basic websocket functions
+ */
+
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -36,7 +40,7 @@ static void ws_print_frame(char *prefix, char *frame, int len)
 }
 
 /**
- * ws_mkframe(): make a websocket frame
+ * make a websocket frame
  *
  * @param frame pointer to buffer where frame shall be written
  * @param msg pointer to data

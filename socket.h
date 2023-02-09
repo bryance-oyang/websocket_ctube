@@ -1,3 +1,7 @@
+/** @file
+ * @brief basic socket functions
+ */
+
 #ifndef SOCKET_H
 #define SOCKET_H
 

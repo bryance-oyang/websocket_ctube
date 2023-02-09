@@ -1,3 +1,7 @@
+/** @file
+ * @brief branch predictor helper
+ */
+
 #ifndef LIKELY_H
 #define LIKELY_H
 

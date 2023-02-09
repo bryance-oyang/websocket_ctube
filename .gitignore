@@ -2,3 +2,5 @@
 *.o
 a.out
 vgcore.*
+latex/
+html/

@@ -1,4 +1,6 @@
-/** thread-safe doubly linked list */
+/** @file
+ * @brief thread-safe doubly linked list
+ */
 
 #ifndef LIST_H
 #define LIST_H

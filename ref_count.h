@@ -1,4 +1,6 @@
-/** thread-safe reference counting */
+/** @file
+ * @brief thread-safe reference counting
+ */
 
 #ifndef REF_COUNT_H
 #define REF_COUNT_H
