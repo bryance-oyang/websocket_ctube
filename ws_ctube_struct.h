@@ -11,7 +11,6 @@
 struct ws_data {
 	void *data;
 	size_t data_size;
-	pthread_mutex_t mutex;
 
 	struct list_node lnode;
 };
@@ -24,7 +23,6 @@ static int ws_data_init(struct ws_data *ws_data, size_t data_size)
 	}
 
 	ws_data->data_size = data_size;
-	pthread_mutex_init(&ws_data->mutex, NULL);
 
 	list_node_init(&ws_data->lnode);
 	return 0;
@@ -41,7 +39,6 @@ static void ws_data_destroy(struct ws_data *ws_data)
 	}
 
 	ws_data->data_size = 0;
-	pthread_mutex_destroy(&ws_data->mutex);
 
 	list_node_destroy(&ws_data->lnode);
 }
@@ -49,8 +46,6 @@ static void ws_data_destroy(struct ws_data *ws_data)
 static int ws_data_cp(struct ws_data *ws_data, void *data, size_t data_size)
 {
 	int retval = 0;
-
-	pthread_mutex_lock(&ws_data->mutex);
 
 	if (ws_data->data_size < data_size) {
 		if (ws_data->data != NULL) {
@@ -69,7 +64,6 @@ static int ws_data_cp(struct ws_data *ws_data, void *data, size_t data_size)
 	memcpy(ws_data->data, data, data_size);
 
 out:
-	pthread_mutex_unlock(&ws_data->mutex);
 	return retval;
 }
 
@@ -107,6 +101,25 @@ static void dframes_free(struct dframes *df)
 {
 	dframes_destroy(df);
 	free(df);
+}
+
+static int dframes_resize(struct dframes *df, size_t frames_size)
+{
+	if (frames_size == 0) {
+		if (df->frames != NULL) {
+			free(df->frames);
+			df->frames = NULL;
+		}
+		df->frames_size = 0;
+		return 0;
+	} else {
+		df->frames = realloc(df->frames, frames_size);
+		if (df->frames == NULL) {
+			return -1;
+		}
+		df->frames_size = frames_size;
+		return 0;
+	}
 }
 
 struct conn_struct {
@@ -198,7 +211,7 @@ struct ws_ctube {
 	pthread_mutex_t in_data_mutex;
 	pthread_cond_t in_data_cond;
 
-	struct list out_data_list;
+	struct ws_data out_data;
 	int out_data_pred;
 	pthread_mutex_t out_data_mutex;
 	pthread_cond_t out_data_cond;
@@ -234,7 +247,7 @@ static int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int t
 	pthread_mutex_init(&ctube->in_data_mutex, NULL);
 	pthread_cond_init(&ctube->in_data_cond, NULL);
 
-	list_init(&ctube->out_data_list);
+	ws_data_init(&ctube->out_data, 0);
 	ctube->out_data_pred = 0;
 	pthread_mutex_init(&ctube->out_data_mutex, NULL);
 	pthread_cond_init(&ctube->out_data_cond, NULL);
@@ -293,8 +306,7 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	pthread_mutex_destroy(&ctube->in_data_mutex);
 	pthread_cond_destroy(&ctube->in_data_cond);
 
-	_ws_data_list_clear(&ctube->out_data_list);
-	list_destroy(&ctube->out_data_list);
+	ws_data_destroy(&ctube->out_data);
 	ctube->out_data_pred = 0;
 	pthread_mutex_destroy(&ctube->out_data_mutex);
 	pthread_cond_destroy(&ctube->out_data_cond);
