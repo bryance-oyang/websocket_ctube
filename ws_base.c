@@ -7,44 +7,11 @@
 #include <unistd.h>
 
 #include "ws_base.h"
+#include "socket.h"
 #include "crypt.h"
 
 #define WS_DEBUG 0
 #define WS_BUFLEN 4096
-
-static int send_all(int fd, char *buf, size_t len)
-{
-	while (len > 0) {
-		int nsent = send(fd, buf, len, MSG_NOSIGNAL);
-		if (nsent < 1) {
-			if (WS_DEBUG) {
-				perror(NULL);
-			}
-			return -1;
-		}
-		buf += nsent;
-		len -= nsent;
-	}
-	return 0;
-}
-
-static int recv_all(int fd, char *buf, size_t buf_size, char *delim)
-{
-	while (buf_size > 0) {
-		int nrecv = recv(fd, buf, buf_size, MSG_NOSIGNAL);
-		if (nrecv < 1) {
-			if (WS_DEBUG) {
-				perror(NULL);
-			}
-			return -1;
-		}
-		if (delim != NULL && strstr(buf, delim) != NULL)
-			return 0;
-		buf += nrecv;
-		buf_size -= nrecv;
-	}
-	return 0;
-}
 
 static void ws_print_frame(char *prefix, char *frame, int len)
 {

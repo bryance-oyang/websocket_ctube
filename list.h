@@ -107,6 +107,9 @@ out:
 	pthread_mutex_unlock(&node->mutex);
 }
 
+/**
+ * pops and returns locked node
+ */
 static inline struct list_node *list_lockpop_front(struct list *l)
 {
 	struct list_node *front;
@@ -136,6 +139,9 @@ static inline struct list_node *list_lockpop_front(struct list *l)
 	return front;
 }
 
+/**
+ * pops and returns locked node
+ */
 static inline struct list_node *list_lockpop_back(struct list *l)
 {
 	struct list_node *back;
