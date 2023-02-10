@@ -138,14 +138,29 @@ static int ws_server_response_key(char *server_key, const char *client_key)
 	return 0;
 }
 
-int ws_handshake(int conn)
+int ws_handshake(int conn, const struct timeval *timeout)
 {
 	char rbuf[WS_BUFLEN];
 	char *client_key;
 	char server_key[WS_BUFLEN];
 	char response[WS_BUFLEN];
 
-	recv_all(conn, rbuf, WS_BUFLEN, "\r\n\r\n");
+	/* receive with timeout, but reset to old timeout afterwards */
+	struct timeval old_timeout;
+	socklen_t timeval_size = sizeof(old_timeout);
+	if (getsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, &old_timeout, &timeval_size) < 0) {
+		goto err;
+	}
+	if (setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, timeout, sizeof(*timeout)) < 0) {
+		goto err;
+	}
+	if (recv_all(conn, rbuf, WS_BUFLEN, "\r\n\r\n") != 0) {
+		goto err;
+	}
+	if (setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, &old_timeout, sizeof(old_timeout)) < 0) {
+		goto err;
+	}
+
 	if (WS_DEBUG) {
 		printf("get\n%s\n", rbuf);
 	}
@@ -162,7 +177,14 @@ int ws_handshake(int conn)
 	if (WS_DEBUG) {
 		printf("server response\n%s\n", response);
 	}
+
 	send_all(conn, response, strlen(response));
 
 	return 0;
+
+err:
+	if (WS_DEBUG) {
+		perror("ws_handshake()");
+	}
+	return -1;
 }

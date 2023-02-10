@@ -151,6 +151,7 @@ static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *c
 
 static void conn_struct_destroy(struct conn_struct *conn)
 {
+	close(conn->fd);
 	conn->fd = -1;
 	conn->ctube = NULL;
 
@@ -204,7 +205,9 @@ struct ws_ctube {
 	int server_sock;
 	int port;
 	int conn_limit;
-	struct timespec timeout;
+
+	struct timespec timeout_spec;
+	struct timeval timeout_val;
 
 	struct list in_data_list;
 	int in_data_pred;
@@ -234,13 +237,16 @@ struct ws_ctube {
 	pthread_t server_tid;
 };
 
-static int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, int timeout_ms)
+static int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, unsigned int timeout_ms)
 {
 	ctube->server_sock = -1;
 	ctube->port = port;
 	ctube->conn_limit = conn_limit;
-	ctube->timeout.tv_sec = 0;
-	ctube->timeout.tv_nsec = timeout_ms * 1000000;
+
+	ctube->timeout_spec.tv_sec = timeout_ms / 1000;
+	ctube->timeout_spec.tv_nsec = (timeout_ms % 1000) * 1000000;
+	ctube->timeout_val.tv_sec = timeout_ms / 1000;
+	ctube->timeout_val.tv_usec = (timeout_ms % 1000) * 1000;
 
 	list_init(&ctube->in_data_list);
 	ctube->in_data_pred = 0;
@@ -297,8 +303,11 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	ctube->server_sock = -1;
 	ctube->port = -1;
 	ctube->conn_limit = -1;
-	ctube->timeout.tv_sec = 0;
-	ctube->timeout.tv_nsec = 0;
+
+	ctube->timeout_spec.tv_sec = 0;
+	ctube->timeout_spec.tv_nsec = 0;
+	ctube->timeout_val.tv_sec = 0;
+	ctube->timeout_val.tv_usec = 0;
 
 	_ws_data_list_clear(&ctube->in_data_list);
 	list_destroy(&ctube->in_data_list);

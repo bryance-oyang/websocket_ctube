@@ -56,6 +56,18 @@ static void *reader_main(void *arg)
 {
 	struct conn_struct *conn = (struct conn_struct *)arg;
 	struct ws_ctube *ctube = conn->ctube;
+	char buf[WS_CTUBE_BUFLEN];
+
+	for (;;) {
+		if (recv(conn->fd, buf, WS_CTUBE_BUFLEN, MSG_NOSIGNAL) < 1) {
+			_connq_push(ctube, conn, WS_CONN_STOP);
+			if (WS_CTUBE_DEBUG) {
+				printf("reader_main(): disconnected client\n");
+				fflush(stdout);
+			}
+			return NULL;
+		}
+	}
 
 	return NULL;
 }
@@ -93,6 +105,10 @@ static void *writer_main(void *arg)
 
 		if (send_retval != 0) {
 			_connq_push(ctube, conn, WS_CONN_STOP);
+			if (WS_CTUBE_DEBUG) {
+				printf("writer_main(): disconnected client\n");
+				fflush(stdout);
+			}
 		}
 	}
 
@@ -247,7 +263,7 @@ static void _conn_list_remove(struct list *conn_list, struct conn_struct *conn)
 	ref_count_release(conn, refc, conn_struct_free);
 }
 
-static void handler_process_queue(struct list *connq, struct list *conn_list)
+static void handler_process_queue(struct list *connq, struct list *conn_list, int conn_limit)
 {
 	struct conn_qentry *qentry;
 	struct list_node *node;
@@ -259,8 +275,17 @@ static void handler_process_queue(struct list *connq, struct list *conn_list)
 
 		switch (qentry->act) {
 		case WS_CONN_START:
-			/* TODO: handshake timeout */
-			if (ws_handshake(conn->fd) == 0) {
+			pthread_mutex_lock(&conn_list->mutex);
+			if (conn_list->len >= conn_limit) {
+				pthread_mutex_unlock(&conn_list->mutex);
+				fprintf(stderr, "handler_process_queue(): conn_limit reached\n");
+				fflush(stderr);
+				break;
+			} else {
+				pthread_mutex_unlock(&conn_list->mutex);
+			}
+
+			if (ws_handshake(conn->fd, &conn->ctube->timeout_val) == 0) {
 				conn_struct_start(conn);
 				_conn_list_add(conn_list, conn);
 			}
@@ -331,18 +356,35 @@ static void *handler_main(void *arg)
 		pthread_mutex_unlock(&ctube->connq_mutex);
 		pthread_cleanup_pop(0); /* _cleanup_unlock_mutex */
 
-		handler_process_queue(&ctube->connq, &conn_list);
+		handler_process_queue(&ctube->connq, &conn_list, ctube->conn_limit);
 	}
 
 	pthread_cleanup_pop(1);
 	return NULL;
 }
 
-static int _serve_new_conn(struct ws_ctube *ctube, int conn_fd)
+static void _cleanup_close_client_conn(void *arg)
+{
+	int *fd = (int *)arg;
+	if (*fd >= 0) {
+		close(*fd);
+	}
+}
+
+static int _serve_accept_new_conn(struct ws_ctube *ctube, const int server_sock)
 {
 	int retval = 0;
-	struct conn_struct *conn = malloc(sizeof(*conn));
 
+	int conn_fd = accept(server_sock, NULL, NULL);
+	pthread_cleanup_push(_cleanup_close_client_conn, &conn_fd);
+
+	if (setsockopt(conn_fd, SOL_SOCKET, SO_SNDTIMEO, &ctube->timeout_val, sizeof(ctube->timeout_val)) < 0) {
+		perror("_serve_accept_new_conn()");
+		retval = -1;
+		goto out_noalloc;
+	}
+
+	struct conn_struct *conn = malloc(sizeof(*conn));
 	if (conn == NULL) {
 		retval = -1;
 		goto out_noalloc;
@@ -353,6 +395,8 @@ static int _serve_new_conn(struct ws_ctube *ctube, int conn_fd)
 		retval = -1;
 		goto out_noinit;
 	}
+	/* conn_struct_destroy closes conn_fd now; this prevents _cleanup_close_client_conn() from closing it */
+	conn_fd = -1;
 	pthread_cleanup_push((cleanup_f)conn_struct_destroy, conn);
 
 	if (_connq_push(ctube, conn, WS_CONN_START) != 0) {
@@ -365,17 +409,17 @@ out_nopush:
 out_noinit:
 	pthread_cleanup_pop(retval); /* free */
 out_noalloc:
+	pthread_cleanup_pop(retval); /* _cleanup_close_client_conn */
 	return retval;
 }
 
 static void serve_forever(struct ws_ctube *ctube)
 {
-	int server_sock = ctube->server_sock;
+	const int server_sock = ctube->server_sock;
 
 	for (;;) {
-		int conn_fd = accept(server_sock, NULL, NULL);
-		if (_serve_new_conn(ctube, conn_fd) != 0) {
-			fprintf(stderr, "serve_forever(): error");
+		if (_serve_accept_new_conn(ctube, server_sock) != 0) {
+			fprintf(stderr, "serve_forever(): error\n");
 			fflush(stderr);
 		}
 	}
@@ -505,7 +549,7 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->server_init_mutex);
 	while (!ctube->server_inited) {
-		pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout);
+		pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout_spec);
 	}
 	if (ctube->server_inited < 0) {
 		fprintf(stderr, "ws_ctube_start(): server failed to init\n");
@@ -545,7 +589,7 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
  *
  * @param port port for websocket server
  * @param conn_limit maximum number of connections allowed
- * @param timeout_ms timeout for handshake operations
+ * @param timeout_ms timeout (ms) for socket operations and server starting
  */
 struct ws_ctube *ws_ctube_open(int port, int conn_limit, int timeout_ms)
 {

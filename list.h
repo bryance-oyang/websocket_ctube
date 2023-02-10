@@ -73,6 +73,7 @@ static inline void list_unlink(struct list *l, struct list_node *node)
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
 	_list_node_unlink(node);
+	l->len--;
 	pthread_mutex_unlock(&l->mutex);
 	pthread_mutex_unlock(&node->mutex);
 }
