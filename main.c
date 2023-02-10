@@ -12,8 +12,8 @@ int main()
 	char out[4096];
 	char enc[4096];
 
-	//snprintf(in, 4096, "The quick brown fox jumps over the lazy dog");
-	in[0] = '\0';
+	snprintf(in, 4096, "The quick brown fox jumps over the lazy dog");
+	//in[0] = '\0';
 	//in[0] = 0b01100001;
 	//in[1] = 0b01100010;
 	//in[2] = 0b01100011;

@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-//#include <openssl/sha.h>
 
 #include "crypt.h"
 
@@ -68,71 +67,69 @@ void b64_encode(unsigned char *out, const unsigned char *in, size_t in_bytes)
 
 static inline uint32_t left_rotate(uint32_t w, uint32_t amount)
 {
-	return (w << amount) | (w >> (32U - amount));
+	return (w << amount) | (w >> (32 - amount));
 }
 
-static void sha1_wordgen(uint32_t *const word)
+static inline void sha1_wordgen(uint32_t *const word)
 {
 	for (int i = 16; i < 80; i++) {
 		word[i] = left_rotate(word[i-3] ^ word[i-8] ^ word[i-14] ^ word[i-16], 1);
 	}
 }
 
-static void sha1_total_len_cpy(uint8_t *const byte, const uint64_t total_bits)
+static inline void sha1_total_len_cpy(uint32_t *words, const uint64_t total_bits)
 {
-	uint64_t mask = 0xFF;
-	for (int i = 0; i < 8; i++) {
-		byte[56 + i] = (uint8_t)((total_bits >> 8U*(8U - i - 1U)) & mask);
+	const uint64_t mask = 0xFF;
+
+	words[14] = 0;
+	words[15] = 0;
+	for (int i = 0; i < 2; i++) {
+		for (int j = 0; j < 4; j++) {
+			uint32_t byte = (total_bits >> 8*(8 - (4*i+j) - 1)) & mask;
+			words[14 + i] |= byte << 8*(4 - j - 1);
+		}
 	}
 }
 
-static void sha1_mkwords(uint8_t *const byte, const uint8_t *const in, const size_t len, const int mode, const uint64_t total_bits)
+static inline void sha1_cp_to_words(uint32_t *const words, const uint8_t *const in, const size_t len, int pad)
 {
+	size_t i, w_ind, byte_ind;
+
+	for (i = 0, w_ind = 0, byte_ind = 0; i < len; i++, w_ind = i / 4, byte_ind = i % 4) {
+		uint32_t tmp = in[i];
+		words[w_ind] |= tmp << 8*(4 - byte_ind - 1);
+	}
+	if (pad) {
+		uint32_t one = 0x80;
+		words[w_ind] |= one << 8*(4 - byte_ind - 1);
+	}
+}
+
+static void sha1_mkwords(uint32_t *const words, const uint8_t *const in, const size_t len, const int mode, const uint64_t total_bits)
+{
+	for (int i = 0; i < 16; i++) {
+		words[i] = 0;
+	}
+
 	switch (mode) {
 	case 0:
 		if (len < 56) {
-			for (size_t i = 0; i < len; i++) {
-				byte[i] = in[i];
-			}
-			byte[len] = 0x80;
-			for (size_t i = len + 1; i < 56; i++) {
-				byte[i] = 0;
-			}
-			sha1_total_len_cpy(byte, total_bits);
+			sha1_cp_to_words(words, in, len, 1);
+			sha1_total_len_cpy(words, total_bits);
 		} else if (len < 64) {
-			for (size_t i = 0; i < len; i++) {
-				byte[i] = in[i];
-			}
-			byte[len] = 0x80;
-			for (size_t i = len + 1; i < 64; i++) {
-				byte[i] = 0;
-			}
+			sha1_cp_to_words(words, in, len, 1);
 		} else {
-			for (size_t i = 0; i < 64; i++) {
-				byte[i] = in[i];
-			}
+			sha1_cp_to_words(words, in, len, 0);
 		}
 		break;
 
 	case 1:
 		/* needs total_len appended only */
-		sha1_total_len_cpy(byte, total_bits);
+		sha1_total_len_cpy(words, total_bits);
 		break;
 	}
 
-	sha1_wordgen((uint32_t *)byte);
-
-	if (CRYPT_DEBUG) {
-		for (int i = 0; i < 64; i++) {
-			printf("%02X", byte[i]);
-			if ((i+1) % 16 == 0) {
-				printf("\n");
-			} else if ((i+1) % 4 == 0) {
-				printf(" ");
-			}
-		}
-		printf("\n");
-	}
+	sha1_wordgen(words);
 }
 
 void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
@@ -159,10 +156,24 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 		0xC3D2E1F0
 	};
 
-	uint32_t word[80];
+	uint32_t words[80];
 	int mode = 0;
 	while(1) {
-		sha1_mkwords((uint8_t *)word, in_byte, len_bytes, mode, total_bits);
+		sha1_mkwords(words, in_byte, len_bytes, mode, total_bits);
+		if (CRYPT_DEBUG) {
+			for (int i = 0; i < 16; i++) {
+				for (int j = 0; j < 4; j++) {
+					uint8_t byte = (words[i] >> 8*(4 - j - 1)) & 0xFF;
+					printf("%02X", byte);
+				}
+				if ((i+1) % 4 == 0) {
+					printf("\n");
+				} else {
+					printf(" ");
+				}
+			}
+			printf("\n");
+		}
 
 		uint32_t A = h[0];
 		uint32_t B = h[1];
@@ -171,7 +182,7 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 		uint32_t E = h[4];
 
 		for (int i = 0; i < 20; i++) {
-			uint32_t temp = left_rotate(A, 5) + ((B & C) | ((~B) & D)) + E + word[i] + K[0];
+			uint32_t temp = left_rotate(A, 5) + ((B & C) | ((~B) & D)) + E + words[i] + K[0];
 			E = D;
 			D = C;
 			C = left_rotate(B, 30);
@@ -179,7 +190,7 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 			A = temp;
 		}
 		for (int i = 20; i < 40; i++) {
-			uint32_t temp = left_rotate(A, 5) + (B ^ C ^ D) + E + word[i] + K[1];
+			uint32_t temp = left_rotate(A, 5) + (B ^ C ^ D) + E + words[i] + K[1];
 			E = D;
 			D = C;
 			C = left_rotate(B, 30);
@@ -187,7 +198,7 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 			A = temp;
 		}
 		for (int i = 40; i < 60; i++) {
-			uint32_t temp = left_rotate(A, 5) + ((B & C) | (B & D) | (C & D)) + E + word[i] + K[2];
+			uint32_t temp = left_rotate(A, 5) + ((B & C) | (B & D) | (C & D)) + E + words[i] + K[2];
 			E = D;
 			D = C;
 			C = left_rotate(B, 30);
@@ -195,7 +206,7 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 			A = temp;
 		}
 		for (int i = 60; i < 80; i++) {
-			uint32_t temp = left_rotate(A, 5) + (B ^ C ^ D) + E + word[i] + K[3];
+			uint32_t temp = left_rotate(A, 5) + (B ^ C ^ D) + E + words[i] + K[3];
 			E = D;
 			D = C;
 			C = left_rotate(B, 30);
@@ -226,7 +237,14 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 	uint32_t mask = 0xFF;
 	for (int i = 0; i < 5; i++) {
 		for (int j = 0; j < 4; j++) {
-			out_byte[4*i + j] = (uint8_t)((h[i] >> 8U*(4U - j - 1U)) & mask);
+			out_byte[4*i + j] = (h[i] >> 8*(4 - j - 1)) & mask;
+
+			if (CRYPT_DEBUG) {
+				printf("%02X", out_byte[4*i + j]);
+			}
 		}
+	}
+	if (CRYPT_DEBUG) {
+		printf("\n");
 	}
 }
