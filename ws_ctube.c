@@ -54,6 +54,9 @@ out_noalloc:
 
 static void *reader_main(void *arg)
 {
+	struct conn_struct *conn = (struct conn_struct *)arg;
+	struct ws_ctube *ctube = conn->ctube;
+
 	return NULL;
 }
 
@@ -89,7 +92,7 @@ static void *writer_main(void *arg)
 		ref_count_release(dframes, refc, dframes_free);
 
 		if (send_retval != 0) {
-			/* TODO: disconnect */
+			_connq_push(ctube, conn, WS_CONN_STOP);
 		}
 	}
 
@@ -297,9 +300,11 @@ static void _cleanup_conn_list(void *arg)
 		pthread_mutex_lock(&conn->stopping_mutex);
 		if (!conn->stopping) {
 			conn->stopping = 1;
+			pthread_mutex_unlock(&conn->stopping_mutex);
 			conn_struct_stop(conn);
+		} else {
+			pthread_mutex_unlock(&conn->stopping_mutex);
 		}
-		pthread_mutex_unlock(&conn->stopping_mutex);
 
 		pthread_mutex_unlock(&node->mutex);
 		ref_count_release(conn, refc, conn_struct_free);
@@ -348,7 +353,7 @@ static int _serve_new_conn(struct ws_ctube *ctube, int conn_fd)
 		retval = -1;
 		goto out_noinit;
 	}
-	pthread_cleanup_push(conn_struct_destroy, conn);
+	pthread_cleanup_push((cleanup_f)conn_struct_destroy, conn);
 
 	if (_connq_push(ctube, conn, WS_CONN_START) != 0) {
 		retval = -1;
@@ -365,7 +370,6 @@ out_noalloc:
 
 static void serve_forever(struct ws_ctube *ctube)
 {
-	int oldstate;
 	int server_sock = ctube->server_sock;
 
 	for (;;) {
