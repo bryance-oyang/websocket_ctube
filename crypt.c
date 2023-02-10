@@ -122,7 +122,7 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len)
 	//return;
 
 	const uint8_t *in_byte = (uint8_t *)in;
-	uint32_t *const out_word = (uint32_t *)out;
+	uint8_t *const out_byte = (uint8_t *)out;
 	const uint64_t total_len = len;
 
 	uint32_t h[5];
@@ -189,7 +189,10 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len)
 		}
 	}
 
+	uint8_t mask = 0xFF;
 	for (int i = 0; i < 5; i++) {
-		memcpy(&out_word[i], &h[i], 4);
+		for (int j = 0; j < 4; j++) {
+			out_byte[4*i + j] = (h[i] >> 8*(3 - j)) & mask;
+		}
 	}
 }
