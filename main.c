@@ -11,8 +11,16 @@ int main()
 	char in[4096];
 	char out[4096];
 	char enc[4096];
-	snprintf(in, 4096, "The quick brown fox jumps over the lazy dog");
-	//in[0] = '\0';
+
+	//snprintf(in, 4096, "The quick brown fox jumps over the lazy dog");
+	in[0] = '\0';
+	//in[0] = 0b01100001;
+	//in[1] = 0b01100010;
+	//in[2] = 0b01100011;
+	//in[3] = 0b01100100;
+	//in[4] = 0b01100101;
+	//in[5] = 0;
+
 	sha1sum((unsigned char *)out, (unsigned char *)in, strlen(in));
 	b64_encode((unsigned char *)enc, (unsigned char *)out, 20);
 	printf("%s\n", enc);
