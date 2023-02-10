@@ -1,11 +1,22 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "ws_ctube.h"
+#include "crypt.h"
 
 int main()
 {
+	char in[4096];
+	char out[4096];
+	char enc[4096];
+	snprintf(in, 4096, "");
+	sha1sum((unsigned char *)out, (unsigned char *)in, strlen(in));
+	b64_encode((unsigned char *)enc, (unsigned char *)out, 20);
+	printf("%s\n", enc);
+	return 0;
+
 	struct ws_ctube *ctube;
 	void *data;
 	size_t data_size;
