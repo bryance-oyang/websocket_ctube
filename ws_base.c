@@ -14,7 +14,7 @@
 #include "socket.h"
 #include "crypt.h"
 
-#define WS_DEBUG 1
+#define WS_DEBUG 0
 #define WS_BUFLEN 4096
 
 static void ws_print_frame(char *prefix, char *frame, int len)

@@ -104,11 +104,7 @@ static void *writer_main(void *arg)
 		ref_count_release(dframes, refc, dframes_free);
 
 		if (send_retval != 0) {
-			_connq_push(ctube, conn, WS_CONN_STOP);
-			if (WS_CTUBE_DEBUG) {
-				printf("writer_main(): disconnected client\n");
-				fflush(stdout);
-			}
+			continue;
 		}
 	}
 
@@ -478,7 +474,7 @@ static void *server_main(void *arg)
 	}
 
 	/* set listening */
-	if (listen(server_sock, 1) < 0) {
+	if (listen(server_sock, ctube->conn_limit) < 0) {
 		perror("server_main()");
 		goto out_err;
 	}

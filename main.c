@@ -8,36 +8,20 @@
 
 int main()
 {
-	char in[4096];
-	char out[4096];
-	char enc[4096];
+	int port = 9999;
+	int max_conn = 2;
+	int timeout_ms = 500;
 
-	snprintf(in, 4096, "The quick brown fox jumps over the lazy dog");
-	//in[0] = '\0';
-	//in[0] = 0b01100001;
-	//in[1] = 0b01100010;
-	//in[2] = 0b01100011;
-	//in[3] = 0b01100100;
-	//in[4] = 0b01100101;
-	//in[5] = 0;
+	struct ws_ctube *ctube = ws_ctube_open(port, max_conn, timeout_ms);
 
-	sha1sum((unsigned char *)out, (unsigned char *)in, strlen(in));
-	b64_encode((unsigned char *)enc, (unsigned char *)out, 20);
-	printf("%s\n", enc);
-	return 0;
-
-	struct ws_ctube *ctube;
-	void *data;
-	size_t data_size;
-
-	ctube = ws_ctube_open(9999, 2, 500);
-
-	for (int i = 0; i < 20; i++) {
-		data = malloc(4096);
-		data_size = snprintf(data, 4096, "hello, world! %d\n", i);
+	for (int i = 0; i < 20; i++, sleep(1)) {
+		void *data = malloc(4096);
+		if (data == NULL) {
+			continue;
+		}
+		size_t data_size = snprintf(data, 4096, "hello, world! %d\n", i);
 		ws_ctube_broadcast(ctube, data, data_size);
 		free(data);
-		sleep(1);
 	}
 
 	ws_ctube_close(ctube);
