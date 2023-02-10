@@ -75,6 +75,14 @@ static void sha1_wordgen(uint32_t *const word)
 	}
 }
 
+static void sha1_total_len_cpy(uint8_t *const word, uint64_t total_len)
+{
+	uint64_t mask = 0xFF;
+	for (int i = 0; i < 8; i++) {
+		word[i] = (total_len >> (56 - 8*i)) & mask;
+	}
+}
+
 static void sha1_mkwords(uint8_t *const word, const uint8_t *const in, size_t len, const int mode, const uint64_t total_len)
 {
 	memset(word, 0, 64);
@@ -84,7 +92,7 @@ static void sha1_mkwords(uint8_t *const word, const uint8_t *const in, size_t le
 		if (len < 56) {
 			memcpy(word, in, len);
 			word[len] = 0x80;
-			memcpy(&word[56], &total_len, 8);
+			sha1_total_len_cpy(&word[56], total_len);
 		} else if (len < 64) {
 			memcpy(word, in, len);
 			word[len] = 0x80;
@@ -95,13 +103,13 @@ static void sha1_mkwords(uint8_t *const word, const uint8_t *const in, size_t le
 
 	case 1:
 		/* needs total_len appended only */
-		memcpy(&word[56], &total_len, 8);
+		sha1_total_len_cpy(&word[56], total_len);
 		break;
 
 	case 2:
 		/* needs 1 and total_len appended */
 		word[0] = 0x80;
-		memcpy(&word[56], &total_len, 8);
+		sha1_total_len_cpy(&word[56], total_len);
 		break;
 	}
 
