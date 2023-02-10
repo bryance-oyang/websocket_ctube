@@ -3,12 +3,8 @@
  */
 
 #include <stdint.h>
-#include <stdio.h>
-#include <string.h>
 
 #include "crypt.h"
-
-#define CRYPT_DEBUG 1
 
 static volatile int b64_encode_inited = 0;
 static volatile unsigned char b64_encode_table[64];
@@ -105,7 +101,7 @@ static inline void sha1_cp_to_words(uint32_t *const words, const uint8_t *const 
 	}
 }
 
-static void sha1_mkwords(uint32_t *const words, const uint8_t *const in, const size_t len, const int mode, const uint64_t total_bits)
+static inline void sha1_mkwords(uint32_t *const words, const uint8_t *const in, const size_t len, const int mode, const uint64_t total_bits)
 {
 	for (int i = 0; i < 16; i++) {
 		words[i] = 0;
@@ -119,7 +115,7 @@ static void sha1_mkwords(uint32_t *const words, const uint8_t *const in, const s
 		} else if (len < 64) {
 			sha1_cp_to_words(words, in, len, 1);
 		} else {
-			sha1_cp_to_words(words, in, len, 0);
+			sha1_cp_to_words(words, in, 64, 0);
 		}
 		break;
 
@@ -134,9 +130,6 @@ static void sha1_mkwords(uint32_t *const words, const uint8_t *const in, const s
 
 void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 {
-	//SHA1(in, len, out);
-	//return;
-
 	const uint8_t *in_byte = (uint8_t *)in;
 	uint8_t *const out_byte = (uint8_t *)out;
 	const uint64_t total_bits = ((uint64_t)8 * (uint64_t)len_bytes);
@@ -160,20 +153,6 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 	int mode = 0;
 	while(1) {
 		sha1_mkwords(words, in_byte, len_bytes, mode, total_bits);
-		if (CRYPT_DEBUG) {
-			for (int i = 0; i < 16; i++) {
-				for (int j = 0; j < 4; j++) {
-					uint8_t byte = (words[i] >> 8*(4 - j - 1)) & 0xFF;
-					printf("%02X", byte);
-				}
-				if ((i+1) % 4 == 0) {
-					printf("\n");
-				} else {
-					printf(" ");
-				}
-			}
-			printf("\n");
-		}
 
 		uint32_t A = h[0];
 		uint32_t B = h[1];
@@ -223,7 +202,6 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 		if (mode != 0) {
 			break;
 		}
-
 		if (len_bytes < 56) {
 			break;
 		} else if (len_bytes < 64) {
@@ -238,13 +216,6 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 	for (int i = 0; i < 5; i++) {
 		for (int j = 0; j < 4; j++) {
 			out_byte[4*i + j] = (h[i] >> 8*(4 - j - 1)) & mask;
-
-			if (CRYPT_DEBUG) {
-				printf("%02X", out_byte[4*i + j]);
-			}
 		}
-	}
-	if (CRYPT_DEBUG) {
-		printf("\n");
 	}
 }
