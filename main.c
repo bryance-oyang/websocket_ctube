@@ -12,6 +12,7 @@ int main()
 	char out[4096];
 	char enc[4096];
 	snprintf(in, 4096, "The quick brown fox jumps over the lazy dog");
+	//in[0] = '\0';
 	sha1sum((unsigned char *)out, (unsigned char *)in, strlen(in));
 	b64_encode((unsigned char *)enc, (unsigned char *)out, 20);
 	printf("%s\n", enc);

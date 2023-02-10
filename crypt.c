@@ -65,7 +65,7 @@ void b64_encode(unsigned char *out, const unsigned char *in, size_t in_bytes)
 
 static inline uint32_t left_rotate(uint32_t w, uint32_t amount)
 {
-	return (w << amount) | (w >> (32 - amount));
+	return (w << amount) | (w >> (32U - amount));
 }
 
 static void sha1_wordgen(uint32_t *const word)
@@ -75,45 +75,49 @@ static void sha1_wordgen(uint32_t *const word)
 	}
 }
 
-static void sha1_total_len_cpy(uint8_t *const word, uint64_t total_len)
+static void sha1_total_len_cpy(uint8_t *const byte, const uint64_t total_len)
 {
 	uint64_t mask = 0xFF;
 	for (int i = 0; i < 8; i++) {
-		word[i] = (total_len >> (56 - 8*i)) & mask;
+		byte[56 + i] = (uint8_t)((total_len >> 8U*(8U - i - 1U)) & mask);
 	}
 }
 
-static void sha1_mkwords(uint8_t *const word, const uint8_t *const in, size_t len, const int mode, const uint64_t total_len)
+static void sha1_mkwords(uint8_t *const byte, const uint8_t *const in, const size_t len, const int mode, const uint64_t total_len)
 {
-	memset(word, 0, 64);
-
 	switch (mode) {
 	case 0:
 		if (len < 56) {
-			memcpy(word, in, len);
-			word[len] = 0x80;
-			sha1_total_len_cpy(&word[56], total_len);
+			for (size_t i = 0; i < len; i++) {
+				byte[i] = in[i];
+			}
+			byte[len] = 0x80;
+			for (size_t i = len + 1; i < 56; i++) {
+				byte[i] = 0;
+			}
+			sha1_total_len_cpy(byte, total_len);
 		} else if (len < 64) {
-			memcpy(word, in, len);
-			word[len] = 0x80;
+			for (size_t i = 0; i < len; i++) {
+				byte[i] = in[i];
+			}
+			byte[len] = 0x80;
+			for (size_t i = len + 1; i < 64; i++) {
+				byte[i] = 0;
+			}
 		} else {
-			memcpy(word, in, 64);
+			for (size_t i = 0; i < 64; i++) {
+				byte[i] = in[i];
+			}
 		}
 		break;
 
 	case 1:
 		/* needs total_len appended only */
-		sha1_total_len_cpy(&word[56], total_len);
-		break;
-
-	case 2:
-		/* needs 1 and total_len appended */
-		word[0] = 0x80;
-		sha1_total_len_cpy(&word[56], total_len);
+		sha1_total_len_cpy(byte, total_len);
 		break;
 	}
 
-	sha1_wordgen((uint32_t *)word);
+	sha1_wordgen((uint32_t *)byte);
 }
 
 void sha1sum(unsigned char *out, const unsigned char *in, size_t len)
@@ -123,55 +127,72 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len)
 
 	const uint8_t *in_byte = (uint8_t *)in;
 	uint8_t *const out_byte = (uint8_t *)out;
-	const uint64_t total_len = len;
+	const uint64_t total_len = (uint64_t)len;
 
-	uint32_t h[5];
-	h[0] = 0x67452301;
-	h[1] = 0xEFCDAB89;
-	h[2] = 0x98BADCFE;
-	h[3] = 0x10325476;
-	h[4] = 0xC3D2E1F0;
+	const uint32_t K[4] = {
+		0x5A827999,
+		0x6ED9EBA1,
+		0x8F1BBCDC,
+		0xCA62C1D6
+	};
+
+	uint32_t h[5] = {
+		0x67452301,
+		0xEFCDAB89,
+		0x98BADCFE,
+		0x10325476,
+		0xC3D2E1F0
+	};
+
 	uint32_t word[80];
-
 	int mode = 0;
 	while(1) {
 		sha1_mkwords((uint8_t *)word, in_byte, len, mode, total_len);
 
-		uint32_t a = h[0];
-		uint32_t b = h[1];
-		uint32_t c = h[2];
-		uint32_t d = h[3];
-		uint32_t e = h[4];
+		uint32_t A = h[0];
+		uint32_t B = h[1];
+		uint32_t C = h[2];
+		uint32_t D = h[3];
+		uint32_t E = h[4];
 
-		uint32_t f, k;
-		for (int i = 0; i < 80; i++) {
-			if (i < 20) {
-				f = (b & c) | ((~b) & d);
-				k = 0x5A827999;
-			} else if (20 <= i && i < 40) {
-				f = b ^ c ^ d;
-				k = 0x6ED9EBA1;
-			} else if (40 <= i && i < 60) {
-				f = (b & c) | (b & d) | (c & d);
-				k = 0x8F1BBCDC;
-			} else if (60 <= i && i < 80) {
-				f = b ^ c ^ d;
-				k = 0xCA62C1D6;
-			}
-
-			uint32_t tmp = left_rotate(a, 5) + f + e + k + word[i];
-			e = d;
-			d = c;
-			c = left_rotate(b, 30);
-			b = a;
-			a = tmp;
+		for (int i = 0; i < 20; i++) {
+			uint32_t temp = left_rotate(A, 5) + ((B & C) | ((~B) & D)) + E + word[i] + K[0];
+			E = D;
+			D = C;
+			C = left_rotate(B, 30);
+			B = A;
+			A = temp;
+		}
+		for (int i = 20; i < 40; i++) {
+			uint32_t temp = left_rotate(A, 5) + (B ^ C ^ D) + E + word[i] + K[1];
+			E = D;
+			D = C;
+			C = left_rotate(B, 30);
+			B = A;
+			A = temp;
+		}
+		for (int i = 40; i < 60; i++) {
+			uint32_t temp = left_rotate(A, 5) + ((B & C) | (B & D) | (C & D)) + E + word[i] + K[2];
+			E = D;
+			D = C;
+			C = left_rotate(B, 30);
+			B = A;
+			A = temp;
+		}
+		for (int i = 60; i < 80; i++) {
+			uint32_t temp = left_rotate(A, 5) + (B ^ C ^ D) + E + word[i] + K[3];
+			E = D;
+			D = C;
+			C = left_rotate(B, 30);
+			B = A;
+			A = temp;
 		}
 
-		h[0] += a;
-		h[1] += b;
-		h[2] += c;
-		h[3] += d;
-		h[4] += e;
+		h[0] += A;
+		h[1] += B;
+		h[2] += C;
+		h[3] += D;
+		h[4] += E;
 
 		if (mode != 0) {
 			break;
@@ -181,18 +202,16 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len)
 			break;
 		} else if (len < 64) {
 			mode = 1;
-		} else if (len == 64) {
-			mode = 2;
 		} else {
 			len -= 64;
 			in_byte += 64;
 		}
 	}
 
-	uint8_t mask = 0xFF;
+	uint32_t mask = 0xFF;
 	for (int i = 0; i < 5; i++) {
 		for (int j = 0; j < 4; j++) {
-			out_byte[4*i + j] = (h[i] >> 8*(3 - j)) & mask;
+			out_byte[4*i + j] = (uint8_t)((h[i] >> 8U*(4U - j - 1U)) & mask);
 		}
 	}
 }
