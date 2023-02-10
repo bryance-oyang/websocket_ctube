@@ -3,7 +3,7 @@ srcdir=
 
 SHELL=/bin/sh
 CC=gcc -pipe -mtune=native -march=native
-OFLAGS=-Ofast -flto
+OFLAGS=-O3 -flto
 CFLAGS+=-std=gnu17 -Wall -Wextra
 LDFLAGS=-lc
 PFLAGS=-ggdb3
