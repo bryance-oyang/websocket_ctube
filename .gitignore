@@ -1,5 +1,6 @@
 *.d
 *.o
+*.s
 a.out
 vgcore.*
 latex/

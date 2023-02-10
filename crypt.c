@@ -138,13 +138,13 @@ void sha1sum(unsigned char *out, const unsigned char *in, size_t len)
 		uint32_t f, k;
 		for (int i = 0; i < 80; i++) {
 			if (i < 20) {
-				f = (b & c) ^ ((~b) & d);
+				f = (b & c) | ((~b) & d);
 				k = 0x5A827999;
 			} else if (20 <= i && i < 40) {
 				f = b ^ c ^ d;
 				k = 0x6ED9EBA1;
 			} else if (40 <= i && i < 60) {
-				f = (b & c) ^ (b & d) ^ (c & d);
+				f = (b & c) | (b & d) | (c & d);
 				k = 0x8F1BBCDC;
 			} else if (60 <= i && i < 80) {
 				f = b ^ c ^ d;
