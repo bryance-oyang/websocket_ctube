@@ -7,7 +7,6 @@
 
 #include <pthread.h>
 #include <signal.h>
-#include "container_of.h"
 #include "likely.h"
 
 struct ref_count {

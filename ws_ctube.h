@@ -5,6 +5,7 @@
 #ifndef WS_CTUBE_H
 #define WS_CTUBE_H
 
+#include <stddef.h>
 #include <pthread.h>
 
 /** defined in ws_ctube_struct.h */

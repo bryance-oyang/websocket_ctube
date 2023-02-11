@@ -1,6 +1,9 @@
 #ifndef WEBSOCKET_H
 #define WEBSOCKET_H
 
+#include <stddef.h>
+#include <time.h>
+
 #define WS_FRAME_HDR_SIZE 2
 #define WS_MAX_PAYLD_SIZE 125
 

@@ -6,7 +6,6 @@
 #include "container_of.h"
 #include "ref_count.h"
 #include "list.h"
-#include "ws_ctube.h"
 
 struct ws_data {
 	void *data;
