@@ -68,7 +68,7 @@ static inline float heat_src(float t, int i, int j)
 {
 	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(0.7*t / GRID_SIDE));
 	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(0.5*t / GRID_SIDE));
-	return (0.2 + cosf(0.3*t / GRID_SIDE)) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
+	return (cosf(0.3*t / GRID_SIDE) + 1) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
 }
 
 void *simulation_step(size_t *data_bytes)
@@ -77,12 +77,17 @@ void *simulation_step(size_t *data_bytes)
 
 	for (int i = 1; i < GRID_SIDE - 1; i++) {
 		for (int j = 1; j < GRID_SIDE - 1; j++) {
-			grid[GRID_SIDE*i + j] = (
-				grid[GRID_SIDE*(i+1) + (j+0)] +
-				grid[GRID_SIDE*(i-1) + (j+0)] +
-				grid[GRID_SIDE*(i+0) + (j+1)] +
-				grid[GRID_SIDE*(i+0) + (j-1)]) / 4 +
+			grid[GRID_SIDE*i + j] = 0.25 * (
+				prev_grid[GRID_SIDE*(i+1) + (j+0)] +
+				prev_grid[GRID_SIDE*(i-1) + (j+0)] +
+				prev_grid[GRID_SIDE*(i+0) + (j+1)] +
+				prev_grid[GRID_SIDE*(i+0) + (j-1)]) +
 				heat_src(t, i, j);
+		}
+	}
+	for (int i = 1; i < GRID_SIDE - 1; i++) {
+		for (int j = 1; j < GRID_SIDE - 1; j++) {
+			grid[GRID_SIDE*i + j] *= 0.999;
 		}
 	}
 
@@ -130,10 +135,12 @@ static inline void mkimg()
 	const float Tmax = 4300;
 
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
+		/* linearly map simulation grid data to a temperature */
 		float temperature = (clipf(grid[i], min, max) - min) * (Tmax - Tmin) / (max - min) + Tmin;
+
+		/* img_data to blackbody color corresponding to temperature */
 		blackbody_to_physical(temperature, &pcolor);
 		physical_to_RGB_8(&pcolor, &srgb);
-
 		img_data[3*i + 0] = srgb.RGB[0];
 		img_data[3*i + 1] = srgb.RGB[1];
 		img_data[3*i + 2] = srgb.RGB[2];
