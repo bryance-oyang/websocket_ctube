@@ -4,26 +4,28 @@
 			websocket = new WebSocket("ws://localhost:9999");
 			websocket.binaryType = "arraybuffer";
 
-			websocket.onmessage = (event) => {
+			websocket.onmessage = async (event) => {
 				const data = new DataView(event.data)
 
-				const ctx = document.getElementById("the_it").getContext("2d", {willReadFrequently: true});
-				const img = ctx.getImageData(0, 0, 100, 100);
+				const canvas = document.getElementById("the_it");
+				const ctx = canvas.getContext("2d", {willReadFrequently: true});
+				const img = new ImageData(100, 100);
 				const npix = 100*100;
 
 				for (let i = 0; i < npix; i++) {
-
 					img.data[4*i+0] = data.getUint8(i);
 					img.data[4*i+1] = data.getUint8(i);
 					img.data[4*i+2] = data.getUint8(i);
 					img.data[4*i+3] = 255;
 				}
 
-				ctx.putImageData(img, 0, 0);
+				const bitmap = await createImageBitmap(img);
+				ctx.imageSmoothingEnabled = false;
+				ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 			}
 		</script>
 	</head>
 	<body>
-		<canvas id="the_it" width=100 height=100></canvas>
+		<canvas id="the_it" width=200 height=200></canvas>
 	</body>
 </html>
