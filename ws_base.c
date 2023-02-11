@@ -128,9 +128,12 @@ static int ws_server_response_key(char *server_key, const char *client_key)
 	char magic_client_key[WS_BUFLEN];
 	char client_sha1[WS_BUFLEN];
 
-	strncpy(magic_client_key, client_key, WS_BUFLEN);
+	strncpy(magic_client_key, client_key, WS_BUFLEN - 1);
+	magic_client_key[WS_BUFLEN - 1] = '\0';
+
 	strncat(magic_client_key, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
-		WS_BUFLEN - strlen(magic_client_key));
+		WS_BUFLEN - strlen(magic_client_key) - 1);
+	magic_client_key[WS_BUFLEN - 1] = '\0';
 
 	sha1sum((unsigned char *)client_sha1, (unsigned char *)magic_client_key, strlen(magic_client_key));
 	b64_encode((unsigned char *)server_key, (unsigned char *)client_sha1, sha1_hash_len);
@@ -143,7 +146,7 @@ int ws_handshake(int conn, const struct timeval *timeout)
 	char rbuf[WS_BUFLEN];
 	char *client_key;
 	char server_key[WS_BUFLEN];
-	char response[WS_BUFLEN];
+	char response[2*WS_BUFLEN];
 
 	/* receive with timeout, but reset to old timeout afterwards */
 	struct timeval old_timeout;
@@ -172,8 +175,7 @@ int ws_handshake(int conn, const struct timeval *timeout)
 				"Upgrade: websocket\r\n"
 				"Connection: Upgrade\r\n"
 				"Sec-WebSocket-Accept: %s\r\n\r\n";
-	snprintf(response, WS_BUFLEN - strlen(response_fmt), response_fmt,
-		 server_key);
+	snprintf(response, sizeof(response)/sizeof(response[0]), response_fmt, server_key);
 	if (WS_DEBUG) {
 		printf("server response\n%s\n", response);
 	}

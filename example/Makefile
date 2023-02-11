@@ -1,4 +1,4 @@
-FINAL=ws_ctube.a
+FINAL=a.out
 srcdir=
 
 SHELL=/bin/sh
@@ -99,8 +99,8 @@ headers: $(HDRS:.h=.h.gch)
 dox: Doxyfile
 	doxygen Doxyfile
 
-$(FINAL): $(OBJS)
-	gcc-ar rcs $@ $^
+$(FINAL): $(OBJS) ../ws_ctube.a
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
