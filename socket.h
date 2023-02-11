@@ -1,4 +1,5 @@
-/** @file
+/**
+ * @file
  * @brief basic socket functions
  */
 

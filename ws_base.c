@@ -1,4 +1,5 @@
-/** @file
+/**
+ * @file
  * @brief basic websocket functions
  */
 
@@ -54,10 +55,10 @@ int ws_mkframe(char *frame, const char *msg, size_t msg_size, int first)
 	int payld_size;
 
 	if (msg_size > WS_MAX_PAYLD_SIZE) {
-		frame[0] = first;
+		frame[0] = 2*first;
 		payld_size = WS_MAX_PAYLD_SIZE;
 	} else {
-		frame[0] = 0b10000000 + first;
+		frame[0] = 0b10000000 + 2*first;
 		payld_size = msg_size;
 	}
 

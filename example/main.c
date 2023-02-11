@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "ws_ctube.h"
-#include "crypt.h"
+#include "simulation.h"
 
 int main()
 {
@@ -13,17 +13,14 @@ int main()
 	int timeout_ms = 500;
 
 	struct ws_ctube *ctube = ws_ctube_open(port, max_conn, timeout_ms);
-
-	for (int i = 0; i < 20; i++, sleep(1)) {
-		void *data = malloc(4096);
-		if (data == NULL) {
-			continue;
-		}
-		size_t data_size = snprintf(data, 4096, "hello, world! %d\n", i);
-		ws_ctube_broadcast(ctube, data, data_size);
-		free(data);
+	simulation_init();
+	for (;;) {
+		void *data = simulation_step();
+		size_t data_bytes = GRID_SIDE*GRID_SIDE;
+		ws_ctube_broadcast(ctube, data, data_bytes);
 	}
-
+	simulation_destroy();
 	ws_ctube_close(ctube);
+
 	return 0;
 }

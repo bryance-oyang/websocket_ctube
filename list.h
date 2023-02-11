@@ -1,4 +1,5 @@
-/** @file
+/**
+ * @file
  * @brief thread-safe doubly linked list
  */
 

@@ -1,4 +1,5 @@
-/** @file
+/**
+ * @file
  * @brief branch predictor helper
  */
 
