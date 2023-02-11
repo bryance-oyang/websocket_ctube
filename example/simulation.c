@@ -58,8 +58,8 @@ void simulation_destroy()
 
 static inline float heat_src(float t, int i, int j)
 {
-	float icenter = GRID_SIDE * (0.5 + 0.3*cos(0.7*t / GRID_SIDE));
-	float jcenter = GRID_SIDE * (0.5 + 0.3*sin(0.5*t / GRID_SIDE));
+	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(0.7*t / GRID_SIDE));
+	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(0.5*t / GRID_SIDE));
 	return cosf(0.3*t / GRID_SIDE) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
 }
 

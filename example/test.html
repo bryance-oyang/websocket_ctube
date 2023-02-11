@@ -20,12 +20,12 @@
 				}
 
 				const bitmap = await createImageBitmap(img);
-				ctx.imageSmoothingEnabled = false;
+				ctx.imageSmoothingEnabled = true;
 				ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 			}
 		</script>
 	</head>
 	<body>
-		<canvas id="the_it" width=200 height=200></canvas>
+		<canvas id="the_it" width=500 height=500></canvas>
 	</body>
 </html>
