@@ -211,6 +211,18 @@ static void _cancel_reader(void *arg)
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
+static void _cancel_writer(void *arg)
+{
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
+	struct conn_struct *conn = (struct conn_struct *)arg;
+	pthread_cancel(conn->writer_tid);
+	pthread_join(conn->writer_tid, NULL);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+}
+
 static int conn_struct_start(struct conn_struct *conn)
 {
 	int retval = 0;
@@ -227,9 +239,11 @@ static int conn_struct_start(struct conn_struct *conn)
 		retval = -1;
 		goto out_nowriter;
 	}
+	pthread_cleanup_push(_cancel_writer, conn);
 
+	pthread_cleanup_pop(retval); /* _cancel_writer */
 out_nowriter:
-	pthread_cleanup_pop(retval);
+	pthread_cleanup_pop(retval); /* _cancel_reader */
 out_noreader:
 	return retval;
 }
@@ -519,6 +533,18 @@ static void _cancel_handler(void *arg)
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
+static void _cancel_server(void *arg)
+{
+	int oldstate;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
+	struct ws_ctube *ctube = (struct ws_ctube *)arg;
+	pthread_cancel(ctube->server_tid);
+	pthread_join(ctube->server_tid, NULL);
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+}
+
 static int ws_ctube_start(struct ws_ctube *ctube)
 {
 	int retval = 0;
@@ -542,13 +568,14 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 		retval = -1;
 		goto out_noserver;
 	}
+	pthread_cleanup_push(_cancel_server, ctube);
 
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->server_init_mutex);
 	while (!ctube->server_inited) {
 		pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout_spec);
 	}
-	if (ctube->server_inited < 0) {
+	if (ctube->server_inited <= 0) {
 		fprintf(stderr, "ws_ctube_start(): server failed to init\n");
 		retval = -1;
 		goto out_noinit;
@@ -556,11 +583,12 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 	pthread_mutex_unlock(&ctube->server_init_mutex);
 
 out_noinit:
-	pthread_cleanup_pop(retval);
+	pthread_cleanup_pop(retval); /* _cleanup_unlock_mutex */
+	pthread_cleanup_pop(retval); /* _cancel_server */
 out_noserver:
-	pthread_cleanup_pop(retval);
+	pthread_cleanup_pop(retval); /* _cancel_handler */
 out_nohandler:
-	pthread_cleanup_pop(retval);
+	pthread_cleanup_pop(retval); /* _cancel_framer */
 out_noframer:
 	return retval;
 }
@@ -645,6 +673,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
 	ctube->out_data_pred = 1;
 	pthread_cond_signal(&ctube->out_data_cond);
 	pthread_mutex_unlock(&ctube->out_data_mutex);
+
 out_nodatacp:
 	pthread_cleanup_pop(retval); /* _cleanup_unlock_mutex */
 out_nolock:
