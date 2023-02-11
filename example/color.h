@@ -36,7 +36,7 @@ struct color_physical {
 	size_t npoints;
 };
 
-static int color_physical_init(struct color_physical *p, size_t npoints)
+static inline int color_physical_init(struct color_physical *p, size_t npoints)
 {
 	p->npoints = npoints;
 
@@ -64,14 +64,14 @@ err_nowavelen:
 	return -1;
 }
 
-static void color_physical_destroy(struct color_physical *p)
+static inline void color_physical_destroy(struct color_physical *p)
 {
 	p->npoints = 0;
 	free(p->wavelen);
 	free(p->radiance);
 }
 
-static double gamma_correct(double rgb_lin)
+static inline double gamma_correct(double rgb_lin)
 {
 	if (rgb_lin <= 0.0031308) {
 		return 12.92 * rgb_lin;
@@ -80,7 +80,7 @@ static double gamma_correct(double rgb_lin)
 	}
 }
 
-static void XYZ_normalize(struct color_XYZ *restrict c)
+static inline void XYZ_normalize(struct color_XYZ *restrict c)
 {
 	double sum = c->XYZ[0] + c->XYZ[1] + c->XYZ[2];
 	c->XYZ[0] /= sum;
@@ -88,7 +88,7 @@ static void XYZ_normalize(struct color_XYZ *restrict c)
 	c->XYZ[2] /= sum;
 }
 
-static void XYZ_to_RGB(const struct color_XYZ *restrict in, struct color_RGB *restrict out)
+static inline void XYZ_to_RGB(const struct color_XYZ *restrict in, struct color_RGB *restrict out)
 {
 	double lin[3];
 	lin[0] = 3.2406 * in->XYZ[0] - 1.5372 * in->XYZ[1] - 0.4986 * in->XYZ[2];
@@ -100,14 +100,14 @@ static void XYZ_to_RGB(const struct color_XYZ *restrict in, struct color_RGB *re
 	}
 }
 
-static void RGB_to_uint8(const struct color_RGB *restrict in, struct color_RGB_8 *restrict out)
+static inline void RGB_to_uint8(const struct color_RGB *restrict in, struct color_RGB_8 *restrict out)
 {
 	for (int i = 0; i < 3; i++) {
 		out->RGB[i] = (uint8_t)(fmin(1.0, fmax(0.0, in->RGB[i])) * 255.1);
 	}
 }
 
-static double color_piecewise_gauss(double x, double mu, double s1, double s2)
+static inline double color_piecewise_gauss(double x, double mu, double s1, double s2)
 {
 	if (x < mu) {
 		return expf(-(x - mu)*(x - mu) / (2*s1*s1));
@@ -116,7 +116,7 @@ static double color_piecewise_gauss(double x, double mu, double s1, double s2)
 	}
 }
 
-static void color_xyzbar(double wavelen, double *xyzbar)
+static inline void color_xyzbar(double wavelen, double *xyzbar)
 {
 	xyzbar[0] = 1.056 * color_piecewise_gauss(wavelen, 599.8, 37.9, 31.0)
 		+ 0.362 * color_piecewise_gauss(wavelen, 442.0, 16.0, 26.7)
@@ -129,7 +129,7 @@ static void color_xyzbar(double wavelen, double *xyzbar)
 		+ 0.681 * color_piecewise_gauss(wavelen, 459.0, 26.0, 13.8);
 }
 
-static void physical_to_XYZ(const struct color_physical *restrict in, struct color_XYZ *restrict out)
+static inline void physical_to_XYZ(const struct color_physical *restrict in, struct color_XYZ *restrict out)
 {
 	double dl;
 	double xyzbar1[3];
@@ -158,7 +158,7 @@ static void physical_to_XYZ(const struct color_physical *restrict in, struct col
 	}
 }
 
-static void physical_to_RGB_8(const struct color_physical *restrict in, struct color_RGB_8 *restrict out)
+static inline void physical_to_RGB_8(const struct color_physical *restrict in, struct color_RGB_8 *restrict out)
 {
 	struct color_XYZ XYZ;
 	struct color_RGB RGB;
@@ -168,7 +168,7 @@ static void physical_to_RGB_8(const struct color_physical *restrict in, struct c
 	RGB_to_uint8(&RGB, out);
 }
 
-static void blackbody_to_physical(const double temperature, struct color_physical *restrict out)
+static inline void blackbody_to_physical(const double temperature, struct color_physical *restrict out)
 {
 	for (size_t i = 0; i < out->npoints; i++) {
 		const double l = out->wavelen[i] * 1e-9;
