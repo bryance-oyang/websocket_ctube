@@ -27,10 +27,10 @@ int main()
 
 	/* run sim */
 	void *data;
-	size_t data_bytes = GRID_SIDE*GRID_SIDE;
+	size_t data_bytes;
 	simulation_init();
 	for (;;) {
-		data = simulation_step();
+		data = simulation_step(&data_bytes);
 
 		/* only broadcast at given fps */
 		clock_gettime(CLOCK_MONOTONIC, &cur_time);

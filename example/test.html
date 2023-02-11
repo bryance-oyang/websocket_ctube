@@ -13,9 +13,9 @@
 				const npix = 100*100;
 
 				for (let i = 0; i < npix; i++) {
-					img.data[4*i+0] = data.getUint8(i);
-					img.data[4*i+1] = data.getUint8(i);
-					img.data[4*i+2] = data.getUint8(i);
+					img.data[4*i+0] = data.getUint8(3*i+0);
+					img.data[4*i+1] = data.getUint8(3*i+1);
+					img.data[4*i+2] = data.getUint8(3*i+2);
 					img.data[4*i+3] = 255;
 				}
 

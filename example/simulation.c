@@ -10,12 +10,14 @@
 #include <math.h>
 
 #include "simulation.h"
+#include "color.h"
 
 #define SQR(x) ((x)*(x))
 
-static float t;
-static float *grid, *prev_grid;
-static uint8_t *img_data;
+static float t; // time
+static float *grid, *prev_grid; // simulation grid
+static uint8_t *img_data; // simulation grid mapped to image rgb [0,255]
+struct color_physical pcolor;
 
 static inline void mkimg();
 
@@ -29,9 +31,12 @@ int simulation_init()
 	if (prev_grid == NULL)
 		goto err_noprevgrid;
 
-	img_data = malloc(GRID_SIDE*GRID_SIDE*sizeof(*img_data));
+	img_data = malloc(3*GRID_SIDE*GRID_SIDE*sizeof(*img_data));
 	if (img_data == NULL)
 		goto err_noimgdata;
+
+	if (color_physical_init(&pcolor, 32) != 0)
+		goto err_nocolor;
 
 	t = 0;
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
@@ -41,6 +46,8 @@ int simulation_init()
 
 	return 0;
 
+err_nocolor:
+	free(img_data);
 err_noimgdata:
 	free(prev_grid);
 err_noprevgrid:
@@ -54,17 +61,20 @@ void simulation_destroy()
 	free(grid);
 	free(prev_grid);
 	free(img_data);
+	color_physical_destroy(&pcolor);
 }
 
 static inline float heat_src(float t, int i, int j)
 {
 	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(0.7*t / GRID_SIDE));
 	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(0.5*t / GRID_SIDE));
-	return cosf(0.3*t / GRID_SIDE) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
+	return (0.2 + cosf(0.3*t / GRID_SIDE)) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
 }
 
-void *simulation_step()
+void *simulation_step(size_t *data_bytes)
 {
+	*data_bytes = 3*GRID_SIDE*GRID_SIDE;
+
 	for (int i = 1; i < GRID_SIDE - 1; i++) {
 		for (int j = 1; j < GRID_SIDE - 1; j++) {
 			grid[GRID_SIDE*i + j] = (
@@ -101,24 +111,31 @@ static inline void get_minmax_cell(float *min, float *max)
 	}
 }
 
-static inline uint8_t clip(float x)
+static inline float clipf(float x, float min, float max)
 {
-	if (x < 0)
-		return 0;
-	if (x > 255)
-		return 255;
+	if (x < min)
+		return min;
+	if (x > max)
+		return max;
 	return x;
 }
 
 /** map cell data to 0-255 */
 static inline void mkimg()
 {
-	float min, max;
-	//get_minmax_cell(&min, &max);
-	min = -GRID_SIDE / 4;
-	max = GRID_SIDE / 4;
+	struct color_RGB_8 srgb;
+	const float min = 0;
+	const float max = GRID_SIDE / 4;
+	const float Tmin = 600;
+	const float Tmax = 4300;
 
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
-		img_data[i] = clip(255 * ((grid[i] - min) / (max - min)));
+		float temperature = (clipf(grid[i], min, max) - min) * (Tmax - Tmin) / (max - min) + Tmin;
+		blackbody_to_physical(temperature, &pcolor);
+		physical_to_RGB_8(&pcolor, &srgb);
+
+		img_data[3*i + 0] = srgb.RGB[0];
+		img_data[3*i + 1] = srgb.RGB[1];
+		img_data[3*i + 2] = srgb.RGB[2];
 	}
 }
