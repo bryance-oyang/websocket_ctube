@@ -1,4 +1,4 @@
-EXEC=a.out
+FINAL=ws_ctube.a
 srcdir=
 
 SHELL=/bin/sh
@@ -59,28 +59,28 @@ endif
 
 .DEFAULT_GOAL=all
 .PHONY: all
-all: $(DEPS) $(EXEC)
+all: $(DEPS) $(FINAL)
 	@echo done
 
 .PHONY: clean
 clean:
-	-rm -f $(OBJS) $(ASMS) $(DEPS) $(HDRS:.h=.h.gch) $(EXEC) *.out
+	-rm -f $(OBJS) $(ASMS) $(DEPS) $(HDRS:.h=.h.gch) $(FINAL) *.out
 	@echo done
 
 .PHONY: profile
-profile: $(DEPS) $(EXEC)
+profile: $(DEPS) $(FINAL)
 	@echo done
 
 .PHONY: debug
-debug: $(DEPS) $(EXEC)
+debug: $(DEPS) $(FINAL)
 	@echo done
 
 .PHONY: sanitize
-sanitize: $(DEPS) $(EXEC)
+sanitize: $(DEPS) $(FINAL)
 	@echo done
 
 .PHONY: tsanitize
-tsanitize: $(DEPS) $(EXEC)
+tsanitize: $(DEPS) $(FINAL)
 	@echo done
 
 .PHONY: asm
@@ -99,7 +99,7 @@ headers: $(HDRS:.h=.h.gch)
 dox: Doxyfile
 	doxygen Doxyfile
 
-$(EXEC): $(OBJS)
+$(FINAL): $(OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
