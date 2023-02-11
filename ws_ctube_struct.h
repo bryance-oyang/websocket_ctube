@@ -321,6 +321,7 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 
 	if (ctube->dframes != NULL) {
 		ref_count_release(ctube->dframes, refc, dframes_free);
+		ctube->dframes = NULL;
 	}
 	pthread_mutex_destroy(&ctube->dframes_mutex);
 	pthread_cond_destroy(&ctube->dframes_cond);

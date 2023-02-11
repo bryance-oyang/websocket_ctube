@@ -5,7 +5,7 @@ SHELL=/bin/sh
 CC=gcc -pipe -mtune=native -march=native
 OFLAGS=-O3 -flto -ffat-lto-objects
 CFLAGS+=-std=gnu17 -Wall
-LDFLAGS=-lc
+LDFLAGS=-lc -lm
 PFLAGS=-ggdb3
 DFLAGS=$(CFLAGS) -MM -MT
 
