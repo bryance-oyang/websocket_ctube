@@ -18,7 +18,10 @@ static float t; // time
 static float *grid, *prev_grid; // simulation grid
 static pthread_mutex_t img_mutex; // protects img_data
 static uint8_t *img_data; // simulation grid mapped to image rgb [0,255]
-struct color_physical pcolor;
+
+const int low_temperature = 600; // for color mapping
+const int high_temperature = 4300; // for color mapping
+struct blackbody_RGB_8_table blackbody_color_table;
 
 static inline void mkimg();
 
@@ -36,7 +39,7 @@ int simulation_init(pthread_mutex_t **data_mutex)
 	if (img_data == NULL)
 		goto err_noimgdata;
 
-	if (color_physical_init(&pcolor, 32) != 0)
+	if (blackbody_RGB_8_table_init(&blackbody_color_table, low_temperature, high_temperature) != 0)
 		goto err_nocolor;
 
 	pthread_mutex_init(&img_mutex, NULL);
@@ -64,7 +67,7 @@ void simulation_destroy()
 	free(grid);
 	free(prev_grid);
 	free(img_data);
-	color_physical_destroy(&pcolor);
+	blackbody_RGB_8_table_destroy(&blackbody_color_table);
 	pthread_mutex_destroy(&img_mutex);
 }
 
@@ -100,7 +103,7 @@ void simulation_step(void **data, size_t *data_bytes)
 	prev_grid = tmp;
 
 	t += 1;
-	usleep(1000);
+	usleep(2000);
 
 	*data = (void *)img_data;
 	*data_bytes = 3*GRID_SIDE*GRID_SIDE;
@@ -120,6 +123,15 @@ static inline void get_minmax_cell(float *min, float *max)
 	}
 }
 
+static inline int clip(int x, int min, int max)
+{
+	if (x < min)
+		return min;
+	if (x > max)
+		return max;
+	return x;
+}
+
 static inline float clipf(float x, float min, float max)
 {
 	if (x < min)
@@ -132,23 +144,21 @@ static inline float clipf(float x, float min, float max)
 /** map cell data to 0-255 */
 static inline void mkimg()
 {
-	struct color_RGB_8 srgb;
+	struct color_RGB_8 *srgb;
 	const float min = 0;
 	const float max = GRID_SIDE / 4;
-	const float Tmin = 600;
-	const float Tmax = 4300;
 
 	pthread_mutex_lock(&img_mutex);
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
 		/* linearly map simulation grid data to a temperature */
-		float temperature = (clipf(grid[i], min, max) - min) * (Tmax - Tmin) / (max - min) + Tmin;
+		int temperature = (grid[i] - min) * (high_temperature - low_temperature) / (max - min) + low_temperature;
+		temperature = clip(temperature, low_temperature, high_temperature);
 
 		/* img_data to blackbody color corresponding to temperature */
-		blackbody_to_physical(temperature, &pcolor);
-		physical_to_RGB_8(&pcolor, &srgb);
-		img_data[3*i + 0] = srgb.RGB[0];
-		img_data[3*i + 1] = srgb.RGB[1];
-		img_data[3*i + 2] = srgb.RGB[2];
+		srgb = &blackbody_color_table.colors[temperature - low_temperature];
+		img_data[3*i + 0] = srgb->RGB[0];
+		img_data[3*i + 1] = srgb->RGB[1];
+		img_data[3*i + 2] = srgb->RGB[2];
 	}
 	pthread_mutex_unlock(&img_mutex);
 }

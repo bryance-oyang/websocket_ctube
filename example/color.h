@@ -36,6 +36,12 @@ struct color_physical {
 	size_t npoints;
 };
 
+struct blackbody_RGB_8_table {
+	int *temperatures;
+	struct color_RGB_8 *colors;
+	size_t npoints;
+};
+
 static inline int color_physical_init(struct color_physical *p, size_t npoints)
 {
 	p->npoints = npoints;
@@ -178,8 +184,59 @@ static inline void blackbody_to_physical(const double temperature, struct color_
 		out->radiance[i] = coeff * stat;
 
 		/* make order of 1 */
-		out->radiance[i] = 1e-13 * coeff * stat;
+		out->radiance[i] *= 1e-13;
 	}
+}
+
+/** make table of blackbody colors at integer increments of temperature */
+static inline int blackbody_RGB_8_table_init(struct blackbody_RGB_8_table *restrict table, int low_temperature, int high_temperature)
+{
+	if (high_temperature < low_temperature) {
+		return -1;
+	}
+
+	table->npoints = high_temperature - low_temperature + 1;
+
+	table->temperatures = malloc(table->npoints * sizeof(*table->temperatures));
+	if (table->temperatures == NULL) {
+		goto err_notemp;
+	}
+
+	table->colors = malloc(table->npoints * sizeof(*table->colors));
+	if (table->colors == NULL) {
+		goto err_nocolors;
+	}
+
+	struct color_physical physical;
+	if (color_physical_init(&physical, 1024) != 0) {
+		goto err_nophys;
+	}
+
+	/* compute sRGB colors for blackbody temperatures */
+	for (size_t i = 0; i < table->npoints; i++) {
+		int temperature = low_temperature + i;
+		table->temperatures[i] = temperature;
+
+		blackbody_to_physical(temperature, &physical);
+		physical_to_RGB_8(&physical, &table->colors[i]);
+	}
+
+	color_physical_destroy(&physical);
+	return 0;
+
+err_nophys:
+	free(table->colors);
+err_nocolors:
+	free(table->temperatures);
+err_notemp:
+	return -1;
+}
+
+void blackbody_RGB_8_table_destroy(struct blackbody_RGB_8_table *restrict table)
+{
+	free(table->temperatures);
+	free(table->colors);
+	table->npoints = 0;
 }
 
 #endif /* COLOR_H */
