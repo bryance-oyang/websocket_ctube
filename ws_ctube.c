@@ -652,43 +652,42 @@ void ws_ctube_close(struct ws_ctube *ctube)
 
 int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
 {
-	int retval = 0;
-
 	if (data_size == 0) {
 		return 0;
 	}
 
 	/* rate limit broadcasting if set */
 	if (ctube->max_bcast_fps > 0) {
+		if (pthread_mutex_trylock(&ctube->prev_bcast_time_mutex) != 0) {
+			return -1;
+		}
+
 		struct timespec cur_time;
 		clock_gettime(CLOCK_MONOTONIC, &cur_time);
 		double dt = (cur_time.tv_sec - ctube->prev_bcast_time.tv_sec) +
 			1e-9 * (cur_time.tv_nsec - ctube->prev_bcast_time.tv_nsec);
 
 		if (dt < 1.0 / ctube->max_bcast_fps) {
-			return 0;
+			pthread_mutex_unlock(&ctube->prev_bcast_time_mutex);
+			return -1;
 		}
 
 		ctube->prev_bcast_time = cur_time;
+		pthread_mutex_unlock(&ctube->prev_bcast_time_mutex);
 	}
 
 	if (pthread_mutex_trylock(&ctube->out_data_mutex) != 0) {
-		retval = -1;
-		goto out_nolock;
+		return -1;
 	}
-	pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->out_data_mutex);
 
 	if (ws_data_cp(&ctube->out_data, data, data_size) != 0) {
-		retval = -1;
-		goto out_nodatacp;
+		pthread_mutex_unlock(&ctube->out_data_mutex);
+		return -1;
 	}
 
 	ctube->out_data_pred = 1;
 	pthread_cond_signal(&ctube->out_data_cond);
 	pthread_mutex_unlock(&ctube->out_data_mutex);
 
-out_nodatacp:
-	pthread_cleanup_pop(retval); /* _cleanup_unlock_mutex */
-out_nolock:
-	return retval;
+	return 0;
 }

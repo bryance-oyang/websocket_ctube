@@ -235,8 +235,9 @@ struct ws_ctube {
 	pthread_t handler_tid;
 	pthread_t server_tid;
 
-	struct timespec prev_bcast_time;
 	double max_bcast_fps;
+	struct timespec prev_bcast_time;
+	pthread_mutex_t prev_bcast_time_mutex;
 };
 
 static int ws_ctube_init(
@@ -278,9 +279,10 @@ static int ws_ctube_init(
 	pthread_mutex_init(&ctube->server_init_mutex, NULL);
 	pthread_cond_init(&ctube->server_init_cond, NULL);
 
+	ctube->max_bcast_fps = max_broadcast_fps;
 	ctube->prev_bcast_time.tv_sec = 0;
 	ctube->prev_bcast_time.tv_nsec = 0;
-	ctube->max_bcast_fps = max_broadcast_fps;
+	pthread_mutex_init(&ctube->prev_bcast_time_mutex, NULL);
 
 	return 0;
 }
@@ -348,9 +350,10 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	pthread_mutex_destroy(&ctube->server_init_mutex);
 	pthread_cond_destroy(&ctube->server_init_cond);
 
+	ctube->max_bcast_fps = 0;
 	ctube->prev_bcast_time.tv_sec = 0;
 	ctube->prev_bcast_time.tv_nsec = 0;
-	ctube->max_bcast_fps = 0;
+	pthread_mutex_destroy(&ctube->prev_bcast_time_mutex);
 }
 
 #endif /* WS_CTUBE_STRUCT_H */
