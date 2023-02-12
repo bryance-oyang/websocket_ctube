@@ -40,20 +40,11 @@ static void ws_print_frame(char *prefix, char *frame, int len)
 	fflush(stdout);
 }
 
-/**
- * make a websocket frame
- *
- * @param frame pointer to buffer where frame shall be written
- * @param msg pointer to data
- * @param msg_size bytes of message
- * @param first whether this is the first frame in a sequence
- *
- * @return number of bytes of msg contained in frame
- */
 int ws_mkframe(char *frame, const char *msg, size_t msg_size, int first)
 {
 	int payld_size;
 
+	first = !!first;
 	if (msg_size > WS_MAX_PAYLD_SIZE) {
 		frame[0] = 2*first;
 		payld_size = WS_MAX_PAYLD_SIZE;

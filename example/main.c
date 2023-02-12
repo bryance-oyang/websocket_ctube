@@ -23,14 +23,13 @@ int main()
 	/* broadcast at 24 fps */
 	float broadcast_fps = 24;
 	struct timespec prev_time, cur_time;
-	clock_gettime(CLOCK_MONOTONIC, &prev_time);
 
 	/* run sim */
-	void *data;
-	size_t data_bytes;
 	simulation_init();
+	clock_gettime(CLOCK_MONOTONIC, &prev_time);
 	for (;;) {
-		data = simulation_step(&data_bytes);
+		size_t data_bytes;
+		void *data = simulation_step(&data_bytes);
 
 		/* only broadcast at given fps */
 		clock_gettime(CLOCK_MONOTONIC, &cur_time);

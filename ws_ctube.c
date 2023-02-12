@@ -389,12 +389,6 @@ static int _serve_accept_new_conn(struct ws_ctube *ctube, const int server_sock)
 	int conn_fd = accept(server_sock, NULL, NULL);
 	pthread_cleanup_push(_cleanup_close_client_conn, &conn_fd);
 
-	if (setsockopt(conn_fd, SOL_SOCKET, SO_SNDTIMEO, &ctube->timeout_val, sizeof(ctube->timeout_val)) < 0) {
-		perror("_serve_accept_new_conn()");
-		retval = -1;
-		goto out_noalloc;
-	}
-
 	struct conn_struct *conn = malloc(sizeof(*conn));
 	if (conn == NULL) {
 		retval = -1;

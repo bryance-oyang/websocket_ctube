@@ -66,9 +66,9 @@ void simulation_destroy()
 
 static inline float heat_src(float t, int i, int j)
 {
-	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(0.7*t / GRID_SIDE));
-	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(0.5*t / GRID_SIDE));
-	return (cosf(0.3*t / GRID_SIDE) + 1) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
+	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(1.9*t / GRID_SIDE));
+	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(1.5*t / GRID_SIDE));
+	return (cosf(1.2*t / GRID_SIDE) + 1) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
 }
 
 void *simulation_step(size_t *data_bytes)
@@ -98,7 +98,7 @@ void *simulation_step(size_t *data_bytes)
 	prev_grid = tmp;
 
 	t += 1;
-	usleep(3000);
+	usleep(1000);
 	return (void *)img_data;
 }
 

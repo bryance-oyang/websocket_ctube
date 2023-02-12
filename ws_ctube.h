@@ -17,7 +17,7 @@ struct ws_ctube;
  *
  * @param port port for websocket server
  * @param conn_limit maximum number of connections allowed
- * @param timeout_ms timeout (ms) for socket operations and server starting
+ * @param timeout_ms timeout (ms) for server starting and websocket handshake
  */
 struct ws_ctube *ws_ctube_open(int port, int conn_limit, int timeout_ms);
 
