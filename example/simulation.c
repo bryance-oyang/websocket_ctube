@@ -16,12 +16,13 @@
 
 static float t; // time
 static float *grid, *prev_grid; // simulation grid
+static pthread_mutex_t img_mutex; // protects img_data
 static uint8_t *img_data; // simulation grid mapped to image rgb [0,255]
 struct color_physical pcolor;
 
 static inline void mkimg();
 
-int simulation_init()
+int simulation_init(pthread_mutex_t **data_mutex)
 {
 	grid = malloc(GRID_SIDE*GRID_SIDE*sizeof(*grid));
 	if (grid == NULL)
@@ -38,6 +39,8 @@ int simulation_init()
 	if (color_physical_init(&pcolor, 32) != 0)
 		goto err_nocolor;
 
+	pthread_mutex_init(&img_mutex, NULL);
+	*data_mutex = &img_mutex;
 	t = 0;
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
 		prev_grid[i] = 0;
@@ -62,6 +65,7 @@ void simulation_destroy()
 	free(prev_grid);
 	free(img_data);
 	color_physical_destroy(&pcolor);
+	pthread_mutex_destroy(&img_mutex);
 }
 
 static inline float heat_src(float t, int i, int j)
@@ -71,10 +75,8 @@ static inline float heat_src(float t, int i, int j)
 	return (cosf(1.2*t / GRID_SIDE) + 1) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
 }
 
-void *simulation_step(size_t *data_bytes)
+void simulation_step(void **data, size_t *data_bytes)
 {
-	*data_bytes = 3*GRID_SIDE*GRID_SIDE;
-
 	for (int i = 1; i < GRID_SIDE - 1; i++) {
 		for (int j = 1; j < GRID_SIDE - 1; j++) {
 			grid[GRID_SIDE*i + j] = 0.25 * (
@@ -99,7 +101,9 @@ void *simulation_step(size_t *data_bytes)
 
 	t += 1;
 	usleep(1000);
-	return (void *)img_data;
+
+	*data = (void *)img_data;
+	*data_bytes = 3*GRID_SIDE*GRID_SIDE;
 }
 
 static inline void get_minmax_cell(float *min, float *max)
@@ -134,6 +138,7 @@ static inline void mkimg()
 	const float Tmin = 600;
 	const float Tmax = 4300;
 
+	pthread_mutex_lock(&img_mutex);
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
 		/* linearly map simulation grid data to a temperature */
 		float temperature = (clipf(grid[i], min, max) - min) * (Tmax - Tmin) / (max - min) + Tmin;
@@ -145,4 +150,5 @@ static inline void mkimg()
 		img_data[3*i + 1] = srgb.RGB[1];
 		img_data[3*i + 2] = srgb.RGB[2];
 	}
+	pthread_mutex_unlock(&img_mutex);
 }

@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <float.h>
 
 #include "socket.h"
 #include "ws_base.h"
@@ -603,7 +604,11 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
-struct ws_ctube *ws_ctube_open(int port, int conn_limit, int timeout_ms)
+struct ws_ctube *ws_ctube_open(
+	int port,
+	int conn_limit,
+	int timeout_ms,
+	double max_broadcast_fps)
 {
 	int err = 0;
 	struct ws_ctube *ctube;
@@ -615,7 +620,7 @@ struct ws_ctube *ws_ctube_open(int port, int conn_limit, int timeout_ms)
 	}
 	pthread_cleanup_push((cleanup_f)free, ctube);
 
-	if (ws_ctube_init(ctube, port, conn_limit, timeout_ms) != 0) {
+	if (ws_ctube_init(ctube, port, conn_limit, timeout_ms, max_broadcast_fps) != 0) {
 		err = -1;
 		goto out_noinit;
 	}
@@ -651,6 +656,20 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
 
 	if (data_size == 0) {
 		return 0;
+	}
+
+	/* rate limit broadcasting if set */
+	if (ctube->max_bcast_fps > 0) {
+		struct timespec cur_time;
+		clock_gettime(CLOCK_MONOTONIC, &cur_time);
+		double dt = (cur_time.tv_sec - ctube->prev_bcast_time.tv_sec) +
+			1e-9 * (cur_time.tv_nsec - ctube->prev_bcast_time.tv_nsec);
+
+		if (dt < 1.0 / ctube->max_bcast_fps) {
+			return 0;
+		}
+
+		ctube->prev_bcast_time = cur_time;
 	}
 
 	if (pthread_mutex_trylock(&ctube->out_data_mutex) != 0) {

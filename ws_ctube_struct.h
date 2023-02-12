@@ -234,9 +234,17 @@ struct ws_ctube {
 	pthread_t framer_tid;
 	pthread_t handler_tid;
 	pthread_t server_tid;
+
+	struct timespec prev_bcast_time;
+	double max_bcast_fps;
 };
 
-static int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, unsigned int timeout_ms)
+static int ws_ctube_init(
+	struct ws_ctube *ctube,
+	int port,
+	int conn_limit,
+	unsigned int timeout_ms,
+	double max_broadcast_fps)
 {
 	ctube->server_sock = -1;
 	ctube->port = port;
@@ -269,6 +277,10 @@ static int ws_ctube_init(struct ws_ctube *ctube, int port, int conn_limit, unsig
 	ctube->server_inited = 0;
 	pthread_mutex_init(&ctube->server_init_mutex, NULL);
 	pthread_cond_init(&ctube->server_init_cond, NULL);
+
+	ctube->prev_bcast_time.tv_sec = 0;
+	ctube->prev_bcast_time.tv_nsec = 0;
+	ctube->max_bcast_fps = max_broadcast_fps;
 
 	return 0;
 }
@@ -335,6 +347,10 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	ctube->server_inited = 0;
 	pthread_mutex_destroy(&ctube->server_init_mutex);
 	pthread_cond_destroy(&ctube->server_init_cond);
+
+	ctube->prev_bcast_time.tv_sec = 0;
+	ctube->prev_bcast_time.tv_nsec = 0;
+	ctube->max_bcast_fps = 0;
 }
 
 #endif /* WS_CTUBE_STRUCT_H */
