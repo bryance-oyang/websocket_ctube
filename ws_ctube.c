@@ -275,7 +275,7 @@ static void _conn_list_remove(struct list *conn_list, struct conn_struct *conn)
 	ref_count_release(conn, refc, conn_struct_free);
 }
 
-static void handler_process_queue(struct list *connq, struct list *conn_list, int conn_limit)
+static void handler_process_queue(struct list *connq, struct list *conn_list, int max_nclient)
 {
 	struct conn_qentry *qentry;
 	struct list_node *node;
@@ -288,9 +288,9 @@ static void handler_process_queue(struct list *connq, struct list *conn_list, in
 		switch (qentry->act) {
 		case WS_CONN_START:
 			pthread_mutex_lock(&conn_list->mutex);
-			if (conn_list->len >= conn_limit) {
+			if (conn_list->len >= max_nclient) {
 				pthread_mutex_unlock(&conn_list->mutex);
-				fprintf(stderr, "handler_process_queue(): conn_limit reached\n");
+				fprintf(stderr, "handler_process_queue(): max_nclient reached\n");
 				fflush(stderr);
 				break;
 			} else {
@@ -368,7 +368,7 @@ static void *handler_main(void *arg)
 		pthread_mutex_unlock(&ctube->connq_mutex);
 		pthread_cleanup_pop(0); /* _cleanup_unlock_mutex */
 
-		handler_process_queue(&ctube->connq, &conn_list, ctube->conn_limit);
+		handler_process_queue(&ctube->connq, &conn_list, ctube->max_nclient);
 	}
 
 	pthread_cleanup_pop(1);
@@ -477,8 +477,7 @@ static void *server_main(void *arg)
 	int optname = SO_REUSEADDR;
 #endif
 	int yes = 1;
-	if (setsockopt(server_sock, SOL_SOCKET, optname, &yes,
-		sizeof(yes)) < 0) {
+	if (setsockopt(server_sock, SOL_SOCKET, optname, &yes, sizeof(yes)) < 0) {
 		perror("server_main()");
 		goto out_err;
 	}
@@ -490,7 +489,7 @@ static void *server_main(void *arg)
 	}
 
 	/* set listening */
-	if (listen(server_sock, ctube->conn_limit) < 0) {
+	if (listen(server_sock, ctube->max_nclient) < 0) {
 		perror("server_main()");
 		goto out_err;
 	}
@@ -573,8 +572,14 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->server_init_mutex);
-	while (!ctube->server_inited) {
-		pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout_spec);
+	if (&ctube->timeout_spec.tv_nsec > 0 || &ctube->timeout_spec.tv_sec > 0) {
+		while (!ctube->server_inited) {
+			pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout_spec);
+		}
+	} else {
+		while (!ctube->server_inited) {
+			pthread_cond_wait(&ctube->server_init_cond, &ctube->server_init_mutex);
+		}
 	}
 	if (ctube->server_inited <= 0) {
 		fprintf(stderr, "ws_ctube_start(): server failed to init\n");
@@ -612,12 +617,38 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 
 struct ws_ctube *ws_ctube_open(
 	int port,
-	int conn_limit,
+	int max_nclient,
 	int timeout_ms,
 	double max_broadcast_fps)
 {
 	int err = 0;
 	struct ws_ctube *ctube;
+
+	/* input sanity checks */
+	if (port < 1) {
+		fprintf(stderr, "ws_ctube_open(): invalid port\n");
+		fflush(stderr);
+		err = -1;
+		goto out_noalloc;
+	}
+	if (max_nclient < 1) {
+		fprintf(stderr, "ws_ctube_open(): invalid max_nclient\n");
+		fflush(stderr);
+		err = -1;
+		goto out_noalloc;
+	}
+	if (timeout_ms < 0) {
+		fprintf(stderr, "ws_ctube_open(): invalid timeout_ms\n");
+		fflush(stderr);
+		err = -1;
+		goto out_noalloc;
+	}
+	if (max_broadcast_fps < 0) {
+		fprintf(stderr, "ws_ctube_open(): invalid max_broadcast_fps\n");
+		fflush(stderr);
+		err = -1;
+		goto out_noalloc;
+	}
 
 	ctube = malloc(sizeof(*ctube));
 	if (ctube == NULL) {
@@ -626,7 +657,7 @@ struct ws_ctube *ws_ctube_open(
 	}
 	pthread_cleanup_push((cleanup_f)free, ctube);
 
-	if (ws_ctube_init(ctube, port, conn_limit, timeout_ms, max_broadcast_fps) != 0) {
+	if (ws_ctube_init(ctube, port, max_nclient, timeout_ms, max_broadcast_fps) != 0) {
 		err = -1;
 		goto out_noinit;
 	}

@@ -203,7 +203,7 @@ static void conn_qentry_free(struct conn_qentry *qentry)
 struct ws_ctube {
 	int server_sock;
 	int port;
-	int conn_limit;
+	int max_nclient;
 
 	struct timespec timeout_spec;
 	struct timeval timeout_val;
@@ -242,13 +242,13 @@ struct ws_ctube {
 static int ws_ctube_init(
 	struct ws_ctube *ctube,
 	int port,
-	int conn_limit,
+	int max_nclient,
 	unsigned int timeout_ms,
 	double max_broadcast_fps)
 {
 	ctube->server_sock = -1;
 	ctube->port = port;
-	ctube->conn_limit = conn_limit;
+	ctube->max_nclient = max_nclient;
 
 	ctube->timeout_spec.tv_sec = timeout_ms / 1000;
 	ctube->timeout_spec.tv_nsec = (timeout_ms % 1000) * 1000000;
@@ -313,7 +313,7 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 {
 	ctube->server_sock = -1;
 	ctube->port = -1;
-	ctube->conn_limit = -1;
+	ctube->max_nclient = -1;
 
 	ctube->timeout_spec.tv_sec = 0;
 	ctube->timeout_spec.tv_nsec = 0;
