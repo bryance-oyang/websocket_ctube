@@ -471,7 +471,7 @@ static void *server_main(void *arg)
 	pthread_cleanup_push(_close_server_sock, ctube)
 
 	/* allow reuse */
-#ifdef SO_REUSEPORT
+#ifdef __linux__
 	int optname = SO_REUSEADDR | SO_REUSEPORT;
 #else
 	int optname = SO_REUSEADDR;
