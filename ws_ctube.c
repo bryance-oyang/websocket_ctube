@@ -471,19 +471,19 @@ static void *server_main(void *arg)
 	pthread_cleanup_push(_close_server_sock, ctube)
 
 	int yes = 1;
-	if (__linux__) {
+	#if __linux__
 		if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &yes,
 			sizeof(yes)) < 0) {
 			perror("server_main()");
 			goto out_err;
 		}
-	} else {
+	#else
 		if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &yes,
 			sizeof(yes)) < 0) {
 			perror("server_main()");
 			goto out_err;
 		}
-	}
+	#endif
 
 	/* set server socket address/port */
 	if (bind_server(server_sock, ctube->port) < 0) {
