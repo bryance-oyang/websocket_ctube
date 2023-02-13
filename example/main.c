@@ -15,12 +15,15 @@ int main()
 	int timeout_ms = 5000;
 	double max_broadcast_fps = 24;
 	struct ws_ctube *ctube = ws_ctube_open(port, max_conn, timeout_ms, max_broadcast_fps);
+	if (ctube == NULL)
+		return -1;
 
 	/* run sim */
 	pthread_mutex_t *example_data_mutex;
 	void *data;
 	size_t data_bytes;
-	simulation_init(&example_data_mutex);
+	if (simulation_init(&example_data_mutex) != 0)
+		return -1;
 	for (;;) {
 		simulation_step(&data, &data_bytes);
 
