@@ -470,20 +470,18 @@ static void *server_main(void *arg)
 	ctube->server_sock = server_sock;
 	pthread_cleanup_push(_close_server_sock, ctube)
 
+	/* allow reuse */
+#ifdef SO_REUSEPORT
+	int optname = SO_REUSEADDR | SO_REUSEPORT;
+#else
+	int optname = SO_REUSEADDR;
+#endif
 	int yes = 1;
-	#if __linux__
-		if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &yes,
-			sizeof(yes)) < 0) {
-			perror("server_main()");
-			goto out_err;
-		}
-	#else
-		if (setsockopt(server_sock, SOL_SOCKET, SO_REUSEADDR, &yes,
-			sizeof(yes)) < 0) {
-			perror("server_main()");
-			goto out_err;
-		}
-	#endif
+	if (setsockopt(server_sock, SOL_SOCKET, optname, &yes,
+		sizeof(yes)) < 0) {
+		perror("server_main()");
+		goto out_err;
+	}
 
 	/* set server socket address/port */
 	if (bind_server(server_sock, ctube->port) < 0) {
