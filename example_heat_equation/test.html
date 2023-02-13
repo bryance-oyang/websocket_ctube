@@ -1,7 +1,8 @@
 <html>
 	<head>
+		<title>Websocket Ctube Demo</title>
 		<script lang="javascript">
-			websocket = new WebSocket("ws://localhost:9999");
+			websocket = new WebSocket("ws://localhost:9743");
 			websocket.binaryType = "arraybuffer";
 
 			websocket.onmessage = async (event) => {
@@ -20,12 +21,17 @@
 				}
 
 				const bitmap = await createImageBitmap(img);
-				ctx.imageSmoothingEnabled = true;
+				// ctx.imageSmoothingEnabled = true;
 				ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 			}
 		</script>
 	</head>
 	<body>
+		<h1>Websocket Ctube Demo</h1>
+		<p>Example use case: heat equation is solved in real time with a C program.</p>
+		<p>Data is transmitted from the C program to all connected websocket clients in a non-blocking manner (via separate threads) so the main C code can continue to run.</p>
+		<p>Realtime simulation data from C program visualized below: blowtorch adds heat to metal plate which is also actively cooled.</p>
+
 		<canvas id="the_it" width=500 height=500></canvas>
 	</body>
 </html>

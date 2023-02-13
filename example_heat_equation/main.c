@@ -10,8 +10,8 @@
 int main()
 {
 	/* create websocket server */
-	int port = 9999;
-	int max_conn = 2;
+	int port = 9743;
+	int max_conn = 100;
 	int timeout_ms = 5000;
 	double max_broadcast_fps = 24;
 	struct ws_ctube *ctube = ws_ctube_open(port, max_conn, timeout_ms, max_broadcast_fps);

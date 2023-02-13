@@ -14,7 +14,7 @@
 #include "ws_ctube.h"
 #include "ws_ctube_struct.h"
 
-#define WS_CTUBE_DEBUG 1
+#define WS_CTUBE_DEBUG 0
 #define WS_CTUBE_BUFLEN 4096
 
 typedef void (*cleanup_f)(void *);

@@ -1,6 +1,8 @@
 /**
  * @file
  * @brief random simulation to generator pretty data for example
+ *
+ * Heat equation solver: blowtorch adds heat to metal plate which is also actively cooled
  */
 
 #include <unistd.h>
@@ -75,7 +77,7 @@ static inline float heat_src(float t, int i, int j)
 {
 	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(1.9*t / GRID_SIDE));
 	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(1.5*t / GRID_SIDE));
-	return (cosf(1.2*t / GRID_SIDE) + 1) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/20)));
+	return (cosf(1.2*t / GRID_SIDE) + 1) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/25)));
 }
 
 void simulation_step(void **data, size_t *data_bytes)
