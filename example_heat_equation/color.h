@@ -185,7 +185,7 @@ static inline void blackbody_to_physical(const double temperature, struct color_
 		out->radiance[i] = coeff * stat;
 
 		/* make less big */
-		out->radiance[i] *= 1e-13;
+		out->radiance[i] *= 1e-12;
 	}
 }
 

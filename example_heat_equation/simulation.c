@@ -23,7 +23,7 @@ static pthread_mutex_t img_mutex; // protects img_data
 static uint8_t *img_data; // simulation grid mapped to image rgb [0,255]
 
 const int low_temperature = 600; // for color mapping
-const int high_temperature = 4300; // for color mapping
+const int high_temperature = 3000; // for color mapping
 struct blackbody_RGB_8_table blackbody_color_table;
 
 int simulation_init(pthread_mutex_t **data_mutex)
