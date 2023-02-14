@@ -8,7 +8,7 @@
 ## About
 See `example_heat_equation/main.c` for usage.
 
-This is an example use case: heat equation is solved in real time with a C
+This is an example use case: heat equation pde is solved in real time with a C
 program.
 
 Data is transmitted from the C program to all connected websocket clients in a

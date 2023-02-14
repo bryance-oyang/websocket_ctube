@@ -1,8 +1,9 @@
 /**
  * @file
- * @brief random simulation to generator pretty data for example
+ * @brief random simulation to make pretty data for demo
  *
- * Heat equation solver: blowtorch adds heat to metal plate which is also actively cooled
+ * Barebones heat equation solver: blowtorch adds heat to metal plate which is
+ * also actively cooled
  */
 
 #include <unistd.h>
@@ -25,8 +26,6 @@ const int low_temperature = 600; // for color mapping
 const int high_temperature = 4300; // for color mapping
 struct blackbody_RGB_8_table blackbody_color_table;
 
-static inline void mkimg();
-
 int simulation_init(pthread_mutex_t **data_mutex)
 {
 	grid = malloc(GRID_SIDE*GRID_SIDE*sizeof(*grid));
@@ -46,6 +45,8 @@ int simulation_init(pthread_mutex_t **data_mutex)
 
 	pthread_mutex_init(&img_mutex, NULL);
 	*data_mutex = &img_mutex;
+
+	/* simulation var init */
 	t = 0;
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
 		prev_grid[i] = 0;
@@ -77,29 +78,36 @@ static inline float heat_src(float t, int i, int j)
 {
 	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(1.9*t / GRID_SIDE));
 	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(1.5*t / GRID_SIDE));
-	return (cosf(1.2*t / GRID_SIDE) + 1) * expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/25)));
+	return (cosf(1.2*t / GRID_SIDE) + 1)
+		* expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/25)));
 }
+
+static inline void mkimg();
 
 void simulation_step(void **data, size_t *data_bytes)
 {
+	/* heat diffusion */
 	for (int i = 1; i < GRID_SIDE - 1; i++) {
 		for (int j = 1; j < GRID_SIDE - 1; j++) {
 			grid[GRID_SIDE*i + j] = 0.25 * (
 				prev_grid[GRID_SIDE*(i+1) + (j+0)] +
 				prev_grid[GRID_SIDE*(i-1) + (j+0)] +
 				prev_grid[GRID_SIDE*(i+0) + (j+1)] +
-				prev_grid[GRID_SIDE*(i+0) + (j-1)]) +
-				heat_src(t, i, j);
+				prev_grid[GRID_SIDE*(i+0) + (j-1)]);
 		}
 	}
+
+	/* heating/cooling */
 	for (int i = 1; i < GRID_SIDE - 1; i++) {
 		for (int j = 1; j < GRID_SIDE - 1; j++) {
+			grid[GRID_SIDE*i + j] += heat_src(t, i, j);
 			grid[GRID_SIDE*i + j] *= 0.999;
 		}
 	}
 
 	mkimg();
 
+	/* swap grids */
 	float *tmp = grid;
 	grid = prev_grid;
 	prev_grid = tmp;
@@ -134,16 +142,7 @@ static inline int clip(int x, int min, int max)
 	return x;
 }
 
-static inline float clipf(float x, float min, float max)
-{
-	if (x < min)
-		return min;
-	if (x > max)
-		return max;
-	return x;
-}
-
-/** map cell data to 0-255 */
+/** map cell data to blackbody color */
 static inline void mkimg()
 {
 	struct color_RGB_8 *srgb;
