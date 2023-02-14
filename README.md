@@ -7,7 +7,7 @@ Just call `ws_ctube_broadcast()` to send data to all connected browsers. The mai
 
 ## Requirements
 * POSIX stuff: `pthreads` and friends (aka not Windows)
-* (work in progress, not implemented) `openssl` for TLS/SSL
+* (work in progress, not yet implemented) `openssl` for TLS/SSL
 
 ## Demo
 Demo requires python http.server module and ports 9736, 9743. Run
@@ -33,11 +33,14 @@ void ws_ctube_close(struct ws_ctube *ctube);
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t
 data_size);
 ```
-`ws_ctube_open()` creates the websocket server.
+`ws_ctube_open()`: create the websocket server.
 
-`ws_ctube_close()` to shutdown websocket server and cleanup.
+`ws_ctube_close()`: shutdown the websocket server
 
-`ws_ctube_broadcast()` broadcast arbitrary data to all connected websocket clients in a non-blocking manner. If your program is multi-threaded, `*data` should be protected by a read-lock during this call.
+`ws_ctube_broadcast()`: send arbitrary data to all websocket clients in a
+non-blocking manner. (Tip: if other threads can write to `*data`, get a read-lock to
+protect `*data` before broadcasting. The read-lock can be released immediately
+once this function returns.)
 
 
 See `ws_ctube.h` for detailed documentation.
