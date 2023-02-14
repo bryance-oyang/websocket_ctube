@@ -12,7 +12,7 @@ handled by `ws_ctube`.
 * POSIX stuff: `pthread` and friends (aka not Windows)
 * (work in progress, not yet implemented) `openssl` for TLS/SSL
 
-## Demo
+# Demo
 Demo requires python http.server module and ports 9736, 9743. Run
 ```shell
 ./demo.sh
@@ -25,10 +25,10 @@ real-time simulation data in a browser HTML5 canvas.
 
 See `example_heat_equation/main.c` for example usage source code.
 
-## Usage
+# Usage
 `ws_ctube` is intended to be used as a statically linked library.
 
-### C API
+## C API
 Include `ws_ctube.h` in your project and use
 ```C
 struct ws_ctube *ws_ctube_open(int port, int max_nclient, int timeout_ms, double
@@ -52,7 +52,7 @@ before broadcasting. The read-lock can be released immediately once
 
 See `ws_ctube.h` for detailed documentation.
 
-### Compiling
+## Compiling
 1. Compile the websocket ctube library: `ws_ctube.a`
 ```shell
 cd src
@@ -64,6 +64,6 @@ make
 gcc -o a.out your_file_1.c your_file_2.c ws_ctube.a -lpthread
 ```
 
-## Internal Architecture
-This section describes the internal workings of `ws_ctube`. This is for
+# Internal Architecture
+WIP: This section describes the internal workings of `ws_ctube`. This is for
 documentation purposes only and is not needed to use the API.
