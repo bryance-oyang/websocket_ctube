@@ -2,10 +2,10 @@ FINAL=a.out
 srcdir=
 
 SHELL=/bin/sh
-CC=gcc -pipe -mtune=native -march=native
+CC=gcc -pipe -mtune=native -march=native -pthread
 OFLAGS=-Ofast -flto -ffat-lto-objects
 CFLAGS+=-std=gnu17 -Wall
-LDFLAGS=-lc -lpthread -lm
+LDFLAGS=-lc -lm
 PFLAGS=-ggdb3
 DFLAGS=$(CFLAGS) -MM -MT
 

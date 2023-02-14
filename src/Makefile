@@ -2,10 +2,10 @@ FINAL=ws_ctube.a
 srcdir=
 
 SHELL=/bin/sh
-CC=gcc -pipe -mtune=native -march=native
+CC=gcc -pipe -mtune=native -march=native -pthread
 OFLAGS=-O3 -flto -ffat-lto-objects
 CFLAGS+=-std=gnu17 -Wall
-LDFLAGS=-lc -lpthread
+LDFLAGS=-lc
 PFLAGS=-ggdb3
 DFLAGS=$(CFLAGS) -MM -MT
 

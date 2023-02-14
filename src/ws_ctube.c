@@ -20,7 +20,7 @@
 #define WS_CTUBE_DEBUG 0
 #define WS_CTUBE_BUFLEN 4096
 
-typedef void (*cleanup_f)(void *);
+typedef void (*cleanup_func)(void *);
 
 static void _cleanup_unlock_mutex(void *mutex)
 {
@@ -42,7 +42,7 @@ static int _connq_push(struct ws_ctube *ctube, struct conn_struct *conn, enum qa
 		retval = -1;
 		goto out_noinit;
 	}
-	pthread_cleanup_push((cleanup_f)conn_qentry_destroy, qentry);
+	pthread_cleanup_push((cleanup_func)conn_qentry_destroy, qentry);
 
 	list_push_back(&ctube->connq, &qentry->lnode);
 	pthread_mutex_lock(&ctube->connq_mutex);
@@ -321,7 +321,7 @@ static int _serve_accept_new_conn(struct ws_ctube *ctube, const int server_sock)
 	}
 	/* conn_struct_destroy closes conn_fd now; this prevents _cleanup_close_client_conn() from closing it */
 	conn_fd = -1;
-	pthread_cleanup_push((cleanup_f)conn_struct_destroy, conn);
+	pthread_cleanup_push((cleanup_func)conn_struct_destroy, conn);
 
 	if (_connq_push(ctube, conn, WS_CONN_START) != 0) {
 		retval = -1;
@@ -550,13 +550,13 @@ struct ws_ctube* ws_ctube_open(
 		err = -1;
 		goto out_noalloc;
 	}
-	pthread_cleanup_push((cleanup_f)free, ctube);
+	pthread_cleanup_push((cleanup_func)free, ctube);
 
 	if (ws_ctube_init(ctube, port, max_nclient, timeout_ms, max_broadcast_fps) != 0) {
 		err = -1;
 		goto out_noinit;
 	}
-	pthread_cleanup_push((cleanup_f)ws_ctube_destroy, ctube);
+	pthread_cleanup_push((cleanup_func)ws_ctube_destroy, ctube);
 
 	if (ws_ctube_start(ctube) != 0) {
 		err = -1;
@@ -632,6 +632,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	if (max_bcast_fps > 0) {
 		ctube->prev_bcast_time = cur_time;
 	}
+
 	pthread_mutex_unlock(&ctube->out_data_mutex);
 	pthread_cond_broadcast(&ctube->out_data_cond);
 

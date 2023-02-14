@@ -61,7 +61,7 @@ make
 2. Include `ws_ctube.h` in your project. Use the C API as desired.
 3. Compile your project and link with `ws_ctube.a` and `pthread`. Example:
 ```shell
-gcc -o a.out your_file_1.c your_file_2.c ws_ctube.a -lpthread
+gcc -pthread -o a.out your_file_1.c your_file_2.c ws_ctube.a
 ```
 
 # Internal Architecture
