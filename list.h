@@ -10,8 +10,6 @@
 #include <stddef.h>
 #include "container_of.h"
 
-#pragma GCC visibility push(hidden)
-
 struct list_node {
 	struct list_node *prev;
 	struct list_node *next;
@@ -192,7 +190,5 @@ static inline struct list_node *list_lockpop_back(struct list *l)
 	entry = entry->member.next != &((list)->head) ? \
 	container_of(entry->member.next, typeof(*entry), member) : \
 	NULL)
-
-#pragma GCC visibility pop
 
 #endif /* LIST_H */

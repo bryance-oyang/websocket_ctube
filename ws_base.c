@@ -16,8 +16,6 @@
 #include "ws_base.h"
 #include "crypt.h"
 
-#pragma GCC visibility push(hidden)
-
 #define WS_DEBUG 0
 #define WS_BUFLEN 4096
 

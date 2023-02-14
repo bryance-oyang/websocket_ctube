@@ -9,8 +9,6 @@
 #include <pthread.h>
 #include <signal.h>
 
-#pragma GCC visibility push(hidden)
-
 struct ref_count {
 	volatile int refc;
 };
@@ -42,7 +40,5 @@ static void ref_count_destroy(struct ref_count *ref_count)
 			} \
 		} \
 	} while (0);
-
-#pragma GCC visibility pop
 
 #endif /* REF_COUNT_H */

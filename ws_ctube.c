@@ -17,8 +17,6 @@
 #include "ws_ctube_struct.h"
 #include "socket.h"
 
-#pragma GCC visibility push(hidden)
-
 #define WS_CTUBE_DEBUG 0
 #define WS_CTUBE_BUFLEN 4096
 
@@ -512,9 +510,7 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
-#pragma GCC visibility pop
-
-__attribute__((visibility("default"))) struct ws_ctube* ws_ctube_open(
+struct ws_ctube* ws_ctube_open(
 	int port,
 	int max_nclient,
 	int timeout_ms,
@@ -579,14 +575,14 @@ out_noalloc:
 	}
 }
 
-__attribute__((visibility("default"))) void ws_ctube_close(struct ws_ctube *ctube)
+void ws_ctube_close(struct ws_ctube *ctube)
 {
 	ws_ctube_stop(ctube);
 	ws_ctube_destroy(ctube);
 	free(ctube);
 }
 
-__attribute__((visibility("default"))) int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
+int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
 {
 	if (data_size == 0) {
 		return 0;

@@ -7,8 +7,6 @@
 #include "ref_count.h"
 #include "list.h"
 
-#pragma GCC visibility push(hidden)
-
 struct ws_data {
 	void *data;
 	size_t data_size;
@@ -306,7 +304,5 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	pthread_mutex_destroy(&ctube->server_init_mutex);
 	pthread_cond_destroy(&ctube->server_init_cond);
 }
-
-#pragma GCC visibility pop
 
 #endif /* WS_CTUBE_STRUCT_H */

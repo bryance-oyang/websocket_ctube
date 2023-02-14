@@ -10,8 +10,6 @@
 #include <netinet/in.h>
 #include <stddef.h>
 
-#pragma GCC visibility push(hidden)
-
 static inline int send_all(int fd, char *buf, size_t len)
 {
 	while (len > 0) {
@@ -49,7 +47,5 @@ static inline int bind_server(int server_sock, int port)
 	sa.sin_port = htons(port);
 	return bind(server_sock, (struct sockaddr *)&sa, sizeof(sa));
 }
-
-#pragma GCC visibility pop
 
 #endif /* SOCKET_H */
