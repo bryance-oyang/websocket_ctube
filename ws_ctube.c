@@ -102,7 +102,7 @@ static void *writer_main(void *arg)
 
 		pthread_cleanup_push(_cleanup_release_ws_data, out_data);
 		send_retval = ws_send(conn->fd, out_data->data, out_data->data_size);
-		pthread_cleanup_pop(0); /* _cleanup_release_dframes */
+		pthread_cleanup_pop(0); /* _cleanup_release_ws_data */
 		ref_count_release(out_data, refc, ws_data_free);
 
 		if (send_retval != 0) {
