@@ -2,7 +2,7 @@ FINAL=ws_ctube.a
 srcdir=
 
 SHELL=/bin/sh
-CC=gcc -pipe -mtune=native -march=native -fvisibility=hidden
+CC=gcc -pipe -mtune=native -march=native
 OFLAGS=-O3 -flto -ffat-lto-objects
 CFLAGS+=-std=gnu17 -Wall
 LDFLAGS=-lc -lpthread
