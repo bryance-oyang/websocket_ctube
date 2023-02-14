@@ -23,6 +23,12 @@ TSANITIZE=-ggdb3 -fsanitize=thread
 # Fix false memory leak reporting when using glib2
 #export G_SLICE=always-malloc G_DEBUG=gc-friendly
 
+ifeq (, $(shell which gcc-ar))
+AR=ar
+else
+AR=gcc-ar
+endif
+
 ifdef srcdir
 VPATH=$(srcdir)
 SRCS=$(wildcard $(srcdir)/*.c)
@@ -100,7 +106,7 @@ dox: Doxyfile
 	doxygen Doxyfile
 
 $(FINAL): $(OBJS)
-	gcc-ar rcs $@ $^
+	$(AR) rcs $@ $^
 
 %.o: %.c
 	$(CC) -c $(CFLAGS) -o $@ $<
