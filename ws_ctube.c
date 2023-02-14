@@ -74,127 +74,40 @@ static void *reader_main(void *arg)
 	return NULL;
 }
 
-static void _cleanup_release_dframes(void *arg)
+static void _cleanup_release_ws_data(void *arg)
 {
-	struct dframes *dframes = (struct dframes *)arg;
-	ref_count_release(dframes, refc, dframes_free);
+	struct ws_data *ws_data = (struct ws_data *)arg;
+	ref_count_release(ws_data, refc, ws_data_free);
 }
 
 static void *writer_main(void *arg)
 {
 	struct conn_struct *conn = (struct conn_struct *)arg;
 	struct ws_ctube *ctube = conn->ctube;
-	struct dframes *dframes = NULL;
+	struct ws_data *out_data = NULL;
 	int send_retval;
-
-	for (;;) {
-		pthread_mutex_lock(&ctube->dframes_mutex);
-		pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->dframes_mutex);
-		while (dframes == ctube->dframes) {
-			pthread_cond_wait(&ctube->dframes_cond, &ctube->dframes_mutex);
-		}
-
-		ref_count_acquire(ctube->dframes, refc);
-		dframes = ctube->dframes;
-
-		pthread_cleanup_pop(0); /* _cleanup_unlock_mutex */
-		pthread_mutex_unlock(&ctube->dframes_mutex);
-
-		pthread_cleanup_push(_cleanup_release_dframes, dframes);
-		send_retval = send_all(conn->fd, dframes->frames, dframes->frames_size);
-		pthread_cleanup_pop(0); /* _cleanup_release_dframes */
-		ref_count_release(dframes, refc, dframes_free);
-
-		if (send_retval != 0) {
-			continue;
-		}
-	}
-
-	return NULL;
-}
-
-static int dframes_from_ws_data(struct dframes *df, struct ws_data *out_data)
-{
-	int msg_size, payld_size, frame_size;
-	char *frame, *msg;
-
-	const int nframes = (out_data->data_size + (WS_MAX_PAYLD_SIZE - 1)) / WS_MAX_PAYLD_SIZE;
-	const int total_frames_size = nframes * WS_FRAME_HDR_SIZE + out_data->data_size;
-
-	if (dframes_resize(df, total_frames_size) != 0) {
-		return -1;
-	}
-
-	frame = df->frames;
-	msg = out_data->data;
-	msg_size = out_data->data_size;
-	for (int first = 1; msg_size > 0;
-	first = 0, frame += frame_size, msg += payld_size, msg_size -= payld_size) {
-		payld_size = ws_mkframe(frame, msg, msg_size, first);
-		frame_size = payld_size + WS_FRAME_HDR_SIZE;
-	}
-
-	return 0;
-}
-
-static int frame_out_data(struct ws_ctube *ctube)
-{
-	int retval = 0;
-
-	struct dframes *df = malloc(sizeof(*df));
-	if (df == NULL) {
-		retval = -1;
-		goto out_nodf;
-	}
-	pthread_cleanup_push(free, df);
-
-	if (dframes_init(df) != 0) {
-		retval = -1;
-		goto out_nodf_init;
-	}
-	pthread_cleanup_push((cleanup_f)dframes_destroy, df);
-
-	if (dframes_from_ws_data(df, &ctube->out_data) != 0) {
-		retval = -1;
-		goto out_nodf_data;
-	}
-
-	pthread_mutex_lock(&ctube->dframes_mutex);
-	if (ctube->dframes != NULL) {
-		ref_count_release(ctube->dframes, refc, dframes_free);
-	}
-	ref_count_acquire(df, refc);
-	ctube->dframes = df;
-	pthread_cond_broadcast(&ctube->dframes_cond);
-	pthread_mutex_unlock(&ctube->dframes_mutex);
-
-out_nodf_data:
-	pthread_cleanup_pop(retval); /* dframes_destroy */
-out_nodf_init:
-	pthread_cleanup_pop(retval); /* free */
-out_nodf:
-	return retval;
-}
-
-static void *framer_main(void *arg)
-{
-	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 
 	for (;;) {
 		pthread_mutex_lock(&ctube->out_data_mutex);
 		pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->out_data_mutex);
-		while (!ctube->out_data_pred) {
+		while (out_data == ctube->out_data) {
 			pthread_cond_wait(&ctube->out_data_cond, &ctube->out_data_mutex);
 		}
 
-		ctube->out_data_pred = 0;
-		if (frame_out_data(ctube) != 0) {
-			fprintf(stderr, "framer_main(): frame_out_data failed\n");
-			fflush(stderr);
-		}
+		ref_count_acquire(ctube->out_data, refc);
+		out_data = ctube->out_data;
 
 		pthread_cleanup_pop(0); /* _cleanup_unlock_mutex */
 		pthread_mutex_unlock(&ctube->out_data_mutex);
+
+		pthread_cleanup_push(_cleanup_release_ws_data, out_data);
+		send_retval = ws_send(conn->fd, out_data->data, out_data->data_size);
+		pthread_cleanup_pop(0); /* _cleanup_release_dframes */
+		ref_count_release(out_data, refc, ws_data_free);
+
+		if (send_retval != 0) {
+			continue;
+		}
 	}
 
 	return NULL;
@@ -509,18 +422,6 @@ out_nosock:
 	return NULL;
 }
 
-static void _cancel_framer(void *arg)
-{
-	int oldstate;
-	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
-
-	struct ws_ctube *ctube = (struct ws_ctube *)arg;
-	pthread_cancel(ctube->framer_tid);
-	pthread_join(ctube->framer_tid, NULL);
-
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
-}
-
 static void _cancel_handler(void *arg)
 {
 	int oldstate;
@@ -548,13 +449,6 @@ static void _cancel_server(void *arg)
 static int ws_ctube_start(struct ws_ctube *ctube)
 {
 	int retval = 0;
-
-	if (pthread_create(&ctube->framer_tid, NULL, framer_main, (void *)ctube) != 0) {
-		fprintf(stderr, "ws_ctube_start(): create framer failed\n");
-		retval = -1;
-		goto out_noframer;
-	}
-	pthread_cleanup_push(_cancel_framer, ctube);
 
 	if (pthread_create(&ctube->handler_tid, NULL, handler_main, (void *)ctube) != 0) {
 		fprintf(stderr, "ws_ctube_start(): create handler failed\n");
@@ -594,8 +488,6 @@ out_noinit:
 out_noserver:
 	pthread_cleanup_pop(retval); /* _cancel_handler */
 out_nohandler:
-	pthread_cleanup_pop(retval); /* _cancel_framer */
-out_noframer:
 	return retval;
 }
 
@@ -604,11 +496,9 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	int oldstate;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
-	pthread_cancel(ctube->framer_tid);
 	pthread_cancel(ctube->handler_tid);
 	pthread_cancel(ctube->server_tid);
 
-	pthread_join(ctube->framer_tid, NULL);
 	pthread_join(ctube->handler_tid, NULL);
 	pthread_join(ctube->server_tid, NULL);
 
@@ -701,31 +591,49 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->out_data_mutex);
 
 	/* rate limit broadcasting if set */
-	if (ctube->max_bcast_fps > 0) {
-		struct timespec cur_time;
+	struct timespec cur_time;
+	const double max_bcast_fps = ctube->max_bcast_fps;
+	if (max_bcast_fps > 0) {
 		clock_gettime(CLOCK_MONOTONIC, &cur_time);
 		double dt = (cur_time.tv_sec - ctube->prev_bcast_time.tv_sec) +
 			1e-9 * (cur_time.tv_nsec - ctube->prev_bcast_time.tv_nsec);
 
 		if (dt < 1.0 / ctube->max_bcast_fps) {
 			retval = -1;
-			goto out;
+			goto out_ratelim;
 		}
+	}
 
+	/* alloc new out_data */
+	if (ctube->out_data != NULL) {
+		ref_count_release(ctube->out_data, refc, ws_data_free);
+	}
+	ctube->out_data = malloc(sizeof(*ctube->out_data));
+	if (ctube->out_data == NULL) {
+		retval = -1;
+		goto out_nodata;
+	}
+	pthread_cleanup_push(free, ctube->out_data);
+
+	/* init and memcpy into out_data */
+	if (ws_data_init(ctube->out_data, data, data_size) != 0) {
+		retval = -1;
+		goto out_noinit;
+	}
+	ref_count_acquire(ctube->out_data, refc);
+	pthread_cond_broadcast(&ctube->out_data_cond);
+
+	/* record broadcast time for rate-limiting next time */
+	if (max_bcast_fps > 0) {
 		ctube->prev_bcast_time = cur_time;
 	}
-
-	if (ws_data_cp(&ctube->out_data, data, data_size) != 0) {
-		retval = -1;
-		goto out;
-	}
-
-	ctube->out_data_pred = 1;
-	pthread_cond_signal(&ctube->out_data_cond);
 	pthread_mutex_unlock(&ctube->out_data_mutex);
 
-out:
-	pthread_cleanup_pop(retval);
+out_noinit:
+	pthread_cleanup_pop(retval); /* free */
+out_nodata:
+out_ratelim:
+	pthread_cleanup_pop(retval); /* _cleanup_unlock_mutex */
 out_nolock:
 	return retval;
 }

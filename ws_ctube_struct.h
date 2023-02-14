@@ -11,19 +11,29 @@ struct ws_data {
 	void *data;
 	size_t data_size;
 
+	pthread_mutex_t mutex;
 	struct list_node lnode;
+	struct ref_count refc;
 };
 
-static int ws_data_init(struct ws_data *ws_data, size_t data_size)
+static int ws_data_init(struct ws_data *ws_data, const void *data, size_t data_size)
 {
-	ws_data->data = malloc(data_size);
-	if (ws_data->data == NULL) {
-		goto out_nodata;
+	if (data_size > 0) {
+		ws_data->data = malloc(data_size);
+		if (ws_data->data == NULL) {
+			goto out_nodata;
+		}
+
+		if (data != NULL) {
+			memcpy(ws_data->data, data, data_size);
+		}
 	}
 
 	ws_data->data_size = data_size;
 
+	pthread_mutex_init(&ws_data->mutex, NULL);
 	list_node_init(&ws_data->lnode);
+	ref_count_init(&ws_data->refc);
 	return 0;
 
 out_nodata:
@@ -39,13 +49,16 @@ static void ws_data_destroy(struct ws_data *ws_data)
 
 	ws_data->data_size = 0;
 
+	pthread_mutex_destroy(&ws_data->mutex);
 	list_node_destroy(&ws_data->lnode);
+	ref_count_destroy(&ws_data->refc);
 }
 
-static int ws_data_cp(struct ws_data *ws_data, const void *data, size_t data_size)
+static inline int ws_data_cp(struct ws_data *ws_data, const void *data, size_t data_size)
 {
 	int retval = 0;
 
+	pthread_mutex_lock(&ws_data->mutex);
 	if (ws_data->data_size < data_size) {
 		if (ws_data->data != NULL) {
 			free(ws_data->data);
@@ -63,6 +76,7 @@ static int ws_data_cp(struct ws_data *ws_data, const void *data, size_t data_siz
 	memcpy(ws_data->data, data, data_size);
 
 out:
+	pthread_mutex_unlock(&ws_data->mutex);
 	return retval;
 }
 
@@ -70,55 +84,6 @@ static void ws_data_free(struct ws_data *ws_data)
 {
 	ws_data_destroy(ws_data);
 	free(ws_data);
-}
-
-struct dframes {
-	char *frames;
-	size_t frames_size;
-	struct ref_count refc;
-};
-
-static int dframes_init(struct dframes *df)
-{
-	df->frames = NULL;
-	df->frames_size = 0;
-	ref_count_init(&df->refc);
-	return 0;
-}
-
-static void dframes_destroy(struct dframes *df)
-{
-	if (df->frames != NULL) {
-		free(df->frames);
-		df->frames = NULL;
-	}
-	df->frames_size = 0;
-	ref_count_destroy(&df->refc);
-}
-
-static void dframes_free(struct dframes *df)
-{
-	dframes_destroy(df);
-	free(df);
-}
-
-static int dframes_resize(struct dframes *df, size_t frames_size)
-{
-	if (frames_size == 0) {
-		if (df->frames != NULL) {
-			free(df->frames);
-			df->frames = NULL;
-		}
-		df->frames_size = 0;
-		return 0;
-	} else {
-		df->frames = realloc(df->frames, frames_size);
-		if (df->frames == NULL) {
-			return -1;
-		}
-		df->frames_size = frames_size;
-		return 0;
-	}
 }
 
 struct conn_struct {
@@ -213,17 +178,12 @@ struct ws_ctube {
 	pthread_mutex_t in_data_mutex;
 	pthread_cond_t in_data_cond;
 
-	struct ws_data out_data;
-	int out_data_pred;
+	struct ws_data *out_data;
 	pthread_mutex_t out_data_mutex;
 	pthread_cond_t out_data_cond;
 
 	double max_bcast_fps;
 	struct timespec prev_bcast_time;
-
-	struct dframes *dframes;
-	pthread_mutex_t dframes_mutex;
-	pthread_cond_t dframes_cond;
 
 	struct list connq;
 	int connq_pred;
@@ -234,7 +194,6 @@ struct ws_ctube {
 	pthread_mutex_t server_init_mutex;
 	pthread_cond_t server_init_cond;
 
-	pthread_t framer_tid;
 	pthread_t handler_tid;
 	pthread_t server_tid;
 };
@@ -260,18 +219,13 @@ static int ws_ctube_init(
 	pthread_mutex_init(&ctube->in_data_mutex, NULL);
 	pthread_cond_init(&ctube->in_data_cond, NULL);
 
-	ws_data_init(&ctube->out_data, 0);
-	ctube->out_data_pred = 0;
+	ctube->out_data = NULL;
 	pthread_mutex_init(&ctube->out_data_mutex, NULL);
 	pthread_cond_init(&ctube->out_data_cond, NULL);
 
 	ctube->max_bcast_fps = max_broadcast_fps;
 	ctube->prev_bcast_time.tv_sec = 0;
 	ctube->prev_bcast_time.tv_nsec = 0;
-
-	ctube->dframes = NULL;
-	pthread_mutex_init(&ctube->dframes_mutex, NULL);
-	pthread_cond_init(&ctube->dframes_cond, NULL);
 
 	list_init(&ctube->connq);
 	ctube->connq_pred = 0;
@@ -326,21 +280,16 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	pthread_mutex_destroy(&ctube->in_data_mutex);
 	pthread_cond_destroy(&ctube->in_data_cond);
 
-	ws_data_destroy(&ctube->out_data);
-	ctube->out_data_pred = 0;
+	if (ctube->out_data != NULL) {
+		ref_count_release(ctube->out_data, refc, ws_data_free);
+		ctube->out_data = NULL;
+	}
 	pthread_mutex_destroy(&ctube->out_data_mutex);
 	pthread_cond_destroy(&ctube->out_data_cond);
 
 	ctube->max_bcast_fps = 0;
 	ctube->prev_bcast_time.tv_sec = 0;
 	ctube->prev_bcast_time.tv_nsec = 0;
-
-	if (ctube->dframes != NULL) {
-		ref_count_release(ctube->dframes, refc, dframes_free);
-		ctube->dframes = NULL;
-	}
-	pthread_mutex_destroy(&ctube->dframes_mutex);
-	pthread_cond_destroy(&ctube->dframes_cond);
 
 	_connq_clear(&ctube->connq);
 	list_destroy(&ctube->connq);
