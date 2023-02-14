@@ -1,16 +1,14 @@
 # Websocket Ctube
-C/C++ is fast. Browser technology (HTML/JS/CSS) makes things pretty. Why not
-combine both?
-
-Websocket Ctube (`ws_ctube`) is a barebones API/library to make it easy for a
-running C/C++ program to send data to web browsers in real-time and in a
+Websocket Ctube (`ws_ctube`) is a barebones API/library to make it simple for a
+running C/C++ program to broadcast data to web browsers in real-time and in a
 non-blocking manner.
 
-Just call `ws_ctube_broadcast()` to send data to all connected browsers. The
+Call `ws_ctube_broadcast()` to send data to all connected browsers. The
 main C/C++ program thread can continue to run while the network operations are
 handled by `ws_ctube`.
 
 ## Requirements
+* gcc or similar
 * POSIX stuff: `pthreads` and friends (aka not Windows)
 * (work in progress, not yet implemented) `openssl` for TLS/SSL
 
@@ -48,8 +46,8 @@ data_size);
 non-blocking manner.
 
 Tip: if other threads can write to `*data`, get a read-lock to protect `*data`
-before broadcasting. The read-lock can be released immediately once this
-function returns.
+before broadcasting. The read-lock can be released immediately once
+`ws_ctube_broadcast()` returns.
 
 
 See `ws_ctube.h` for detailed documentation.
@@ -65,7 +63,6 @@ make
 gcc -o a.out your_file_1.c your_file_2.c ws_ctube.a -lpthread
 ```
 
-## Architecture
+## Internal Architecture
 This section describes the internal workings of `ws_ctube`. This is for
-documentation purposes only and users do NOT need to know any of this to be able
-to use `ws_ctube`.
+documentation purposes only and is not needed to use the API.
