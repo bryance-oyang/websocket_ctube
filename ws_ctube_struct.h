@@ -179,6 +179,7 @@ struct ws_ctube {
 	pthread_cond_t in_data_cond;
 
 	struct ws_data *out_data;
+	unsigned long out_data_id;
 	pthread_mutex_t out_data_mutex;
 	pthread_cond_t out_data_cond;
 
@@ -220,6 +221,7 @@ static int ws_ctube_init(
 	pthread_cond_init(&ctube->in_data_cond, NULL);
 
 	ctube->out_data = NULL;
+	ctube->out_data_id = 0;
 	pthread_mutex_init(&ctube->out_data_mutex, NULL);
 	pthread_cond_init(&ctube->out_data_cond, NULL);
 
@@ -284,6 +286,7 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 		ref_count_release(ctube->out_data, refc, ws_data_free);
 		ctube->out_data = NULL;
 	}
+	ctube->out_data_id = 0;
 	pthread_mutex_destroy(&ctube->out_data_mutex);
 	pthread_cond_destroy(&ctube->out_data_cond);
 

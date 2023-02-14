@@ -8,7 +8,7 @@
 			"name": "(gdb) Launch",
 			"type": "cppdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/example/a.out",
+			"program": "${workspaceFolder}/example_heat_equation/a.out",
 			"args": [],
 			"stopAtEntry": false,
 			"cwd": "${fileDirname}",

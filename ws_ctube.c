@@ -85,17 +85,19 @@ static void *writer_main(void *arg)
 	struct conn_struct *conn = (struct conn_struct *)arg;
 	struct ws_ctube *ctube = conn->ctube;
 	struct ws_data *out_data = NULL;
+	unsigned long out_data_id = 0;
 	int send_retval;
 
 	for (;;) {
 		pthread_mutex_lock(&ctube->out_data_mutex);
 		pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->out_data_mutex);
-		while (out_data == ctube->out_data) {
+		while (out_data_id == ctube->out_data_id) {
 			pthread_cond_wait(&ctube->out_data_cond, &ctube->out_data_mutex);
 		}
 
 		ref_count_acquire(ctube->out_data, refc);
 		out_data = ctube->out_data;
+		out_data_id = ctube->out_data_id;
 
 		pthread_cleanup_pop(0); /* _cleanup_unlock_mutex */
 		pthread_mutex_unlock(&ctube->out_data_mutex);
@@ -621,6 +623,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 		goto out_noinit;
 	}
 	ref_count_acquire(ctube->out_data, refc);
+	ctube->out_data_id++;
 	pthread_cond_broadcast(&ctube->out_data_cond);
 
 	/* record broadcast time for rate-limiting next time */
