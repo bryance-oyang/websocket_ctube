@@ -155,7 +155,8 @@ static inline void physical_to_XYZ(const struct color_physical *restrict in, str
 		dl = in->wavelen[i+1] - in->wavelen[i];
 
 		for (int j = 0; j < 3; j++) {
-			out->XYZ[j] += dl/2 * (in->radiance[i]*xyzbar_lower[j] + in->radiance[i+1]*xyzbar_upper[j]);
+			out->XYZ[j] += dl/2 * (in->radiance[i]*xyzbar_lower[j]
+				+ in->radiance[i+1]*xyzbar_upper[j]);
 		}
 
 		tmp = xyzbar_lower;
@@ -183,7 +184,7 @@ static inline void blackbody_to_physical(const double temperature, struct color_
 
 		out->radiance[i] = coeff * stat;
 
-		/* make order of 1 */
+		/* make less big */
 		out->radiance[i] *= 1e-13;
 	}
 }

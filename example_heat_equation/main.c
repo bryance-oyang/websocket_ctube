@@ -47,7 +47,7 @@ int main()
 		pthread_mutex_unlock(example_data_mutex);
 	}
 
-	/* shutdown/cleanup */
+	/* shutdown/cleanup example */
 	simulation_destroy();
 	ws_ctube_close(ctube);
 	return 0;
