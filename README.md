@@ -1,5 +1,5 @@
 # Websocket Ctube
-Websocket Ctube (`ws_ctube`) is a barebones API/library to make it simple for a
+Websocket Ctube (`ws_ctube`) is a barebones C API/library to make it simple for a
 running C/C++ program to broadcast data to web browsers in real-time and in a
 non-blocking manner.
 
@@ -9,7 +9,7 @@ handled by `ws_ctube`.
 
 ## Requirements
 * gcc or similar
-* POSIX stuff: `pthreads` and friends (aka not Windows)
+* POSIX stuff: `pthread` and friends (aka not Windows)
 * (work in progress, not yet implemented) `openssl` for TLS/SSL
 
 ## Demo
@@ -20,8 +20,8 @@ Demo requires python http.server module and ports 9736, 9743. Run
 then once the server has started, open a modern :) browser to
 `http://localhost:9736/heat_equation.html`
 
-The included demo solves the heat equation PDE in a C program and displays real-time
-simulation data in a browser HTML5 canvas.
+The included demo solves the heat equation PDE in a C program and displays
+real-time simulation data in a browser HTML5 canvas.
 
 See `example_heat_equation/main.c` for example usage source code.
 
@@ -43,7 +43,7 @@ data_size);
 `ws_ctube_close()`: shutdown the websocket server
 
 `ws_ctube_broadcast()`: send arbitrary data to all websocket clients in a
-non-blocking manner.
+non-blocking manner. Data is copied to an internal out-buffer, then this function returns. Actual network operations are handled internally by separate threads.
 
 Tip: if other threads can write to `*data`, get a read-lock to protect `*data`
 before broadcasting. The read-lock can be released immediately once

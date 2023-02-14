@@ -6,8 +6,8 @@
 #ifndef WS_CTUBE_H
 #define WS_CTUBE_H
 
-#include <stddef.h>
 #include <pthread.h>
+#include <stddef.h>
 
 /** defined in ws_ctube_struct.h */
 struct ws_ctube;
@@ -33,7 +33,9 @@ struct ws_ctube *ws_ctube_open(int port, int max_nclient, int timeout_ms, double
 void ws_ctube_close(struct ws_ctube *ctube);
 
 /**
- * Tries to queue data for sending to all connected websocket clients.
+ * Tries to queue data for sending to all connected websocket clients. Data is
+ * copied to an internal out-buffer, then this function returns. Actual network
+ * operations are handled internally by separate threads.
  *
  * If other threads can write to *data, get a read-lock to protect *data before
  * broadcasting. The read-lock can be released immediately once this function

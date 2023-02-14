@@ -7,6 +7,8 @@
 
 #include "crypt.h"
 
+#pragma GCC visibility push(hidden)
+
 static volatile int b64_encode_inited = 0;
 static volatile unsigned char b64_encode_table[64];
 static const uint32_t b64_mask = 63;

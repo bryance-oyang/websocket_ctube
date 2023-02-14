@@ -6,9 +6,11 @@
 #ifndef SOCKET_H
 #define SOCKET_H
 
-#include <stddef.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <stddef.h>
+
+#pragma GCC visibility push(hidden)
 
 static inline int send_all(int fd, char *buf, size_t len)
 {
@@ -39,12 +41,15 @@ static inline int recv_all(int fd, char *buf, size_t buf_size, char *delim)
 	return 0;
 }
 
-static inline int bind_server(int server_sock, int port) {
+static inline int bind_server(int server_sock, int port)
+{
 	struct sockaddr_in sa;
 	sa.sin_family = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
 	sa.sin_port = htons(port);
 	return bind(server_sock, (struct sockaddr *)&sa, sizeof(sa));
 }
+
+#pragma GCC visibility pop
 
 #endif /* SOCKET_H */

@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <time.h>
 
+#pragma GCC visibility push(hidden)
+
 #define WS_FRAME_HDR_SIZE 2
 #define WS_MAX_PAYLD_SIZE 125
 
@@ -26,5 +28,6 @@ int ws_is_ping(const char *msg, int msg_size);
 int ws_pong(int conn, const char *msg, int msg_size);
 int ws_handshake(int conn, const struct timeval *timeout);
 
+#pragma GCC visibility pop
 
 #endif /* WEBSOCKET_H */

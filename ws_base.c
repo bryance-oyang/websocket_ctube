@@ -3,17 +3,20 @@
  * @brief basic websocket functions
  */
 
+#include <unistd.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <pthread.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
-#include "ws_base.h"
 #include "socket.h"
+#include "ws_base.h"
 #include "crypt.h"
+
+#pragma GCC visibility push(hidden)
 
 #define WS_DEBUG 0
 #define WS_BUFLEN 4096

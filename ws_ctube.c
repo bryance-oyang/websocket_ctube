@@ -4,15 +4,20 @@
  */
 
 #include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <float.h>
 
-#include "socket.h"
-#include "ws_base.h"
 #include "ws_ctube.h"
+#include "ws_base.h"
 #include "ws_ctube_struct.h"
+#include "socket.h"
+
+#pragma GCC visibility push(hidden)
 
 #define WS_CTUBE_DEBUG 0
 #define WS_CTUBE_BUFLEN 4096
@@ -507,7 +512,9 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
 
-struct ws_ctube *ws_ctube_open(
+#pragma GCC visibility pop
+
+__attribute__((visibility("default"))) struct ws_ctube* ws_ctube_open(
 	int port,
 	int max_nclient,
 	int timeout_ms,
@@ -572,14 +579,14 @@ out_noalloc:
 	}
 }
 
-void ws_ctube_close(struct ws_ctube *ctube)
+__attribute__((visibility("default"))) void ws_ctube_close(struct ws_ctube *ctube)
 {
 	ws_ctube_stop(ctube);
 	ws_ctube_destroy(ctube);
 	free(ctube);
 }
 
-int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
+__attribute__((visibility("default"))) int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
 {
 	if (data_size == 0) {
 		return 0;
