@@ -1,5 +1,3 @@
-#!/bin/bash
-
 cd "${0%/*}"
 
 make clean
