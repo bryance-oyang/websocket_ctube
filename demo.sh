@@ -2,10 +2,11 @@
 
 cd "${0%/*}"
 
+cd src
 make clean
 make
 
-cd example_heat_equation
+cd ../example_heat_equation
 make clean
 make
 

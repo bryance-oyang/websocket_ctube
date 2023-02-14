@@ -55,6 +55,7 @@ See `ws_ctube.h` for detailed documentation.
 ### Compiling
 1. Compile the websocket ctube library: `ws_ctube.a`
 ```shell
+cd src
 make
 ```
 2. Include `ws_ctube.h` in your project. Use the C API as desired.
