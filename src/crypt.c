@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "crypt.h"
+#include "static_assert.h"
 
 static volatile int b64_encode_inited = 0;
 static volatile unsigned char b64_encode_table[64];
@@ -131,6 +132,8 @@ static inline void sha1_mkwords(uint32_t *const words, const uint8_t *const in, 
 
 void sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 {
+	_Static_assert(sizeof(uint8_t) == sizeof(unsigned char), "sha1sum(): unsigned char not 8 bits");
+
 	const uint8_t *in_byte = (uint8_t *)in;
 	uint8_t *const out_byte = (uint8_t *)out;
 	const uint64_t total_bits = ((uint64_t)8 * (uint64_t)len_bytes);
