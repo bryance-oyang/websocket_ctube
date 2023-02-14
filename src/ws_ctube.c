@@ -47,8 +47,8 @@ static int _connq_push(struct ws_ctube *ctube, struct conn_struct *conn, enum qa
 	list_push_back(&ctube->connq, &qentry->lnode);
 	pthread_mutex_lock(&ctube->connq_mutex);
 	ctube->connq_pred = 1;
-	pthread_cond_signal(&ctube->connq_cond);
 	pthread_mutex_unlock(&ctube->connq_mutex);
+	pthread_cond_signal(&ctube->connq_cond);
 
 	pthread_cleanup_pop(retval); /* conn_qentry_destory */
 out_noinit:
@@ -357,8 +357,8 @@ static void _server_init_fail(void *arg)
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	ctube->server_inited = -1;
-	pthread_cond_broadcast(&ctube->server_init_cond);
 	pthread_mutex_unlock(&ctube->server_init_mutex);
+	pthread_cond_signal(&ctube->server_init_cond);
 
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
 }
@@ -415,8 +415,8 @@ static void *server_main(void *arg)
 	/* success */
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	ctube->server_inited = 1;
-	pthread_cond_broadcast(&ctube->server_init_cond);
 	pthread_mutex_unlock(&ctube->server_init_mutex);
+	pthread_cond_signal(&ctube->server_init_cond);
 	serve_forever(ctube);
 
 	/* code doesn't get here unless error */
@@ -471,7 +471,7 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	pthread_cleanup_push(_cleanup_unlock_mutex, &ctube->server_init_mutex);
-	if (&ctube->timeout_spec.tv_nsec > 0 || &ctube->timeout_spec.tv_sec > 0) {
+	if (ctube->timeout_spec.tv_nsec > 0 || ctube->timeout_spec.tv_sec > 0) {
 		while (!ctube->server_inited) {
 			pthread_cond_timedwait(&ctube->server_init_cond, &ctube->server_init_mutex, &ctube->timeout_spec);
 		}
@@ -627,13 +627,13 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	}
 	ref_count_acquire(ctube->out_data, refc);
 	ctube->out_data_id++;
-	pthread_cond_broadcast(&ctube->out_data_cond);
 
 	/* record broadcast time for rate-limiting next time */
 	if (max_bcast_fps > 0) {
 		ctube->prev_bcast_time = cur_time;
 	}
 	pthread_mutex_unlock(&ctube->out_data_mutex);
+	pthread_cond_broadcast(&ctube->out_data_cond);
 
 out_noinit:
 	pthread_cleanup_pop(retval); /* free */
