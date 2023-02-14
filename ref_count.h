@@ -8,7 +8,6 @@
 
 #include <pthread.h>
 #include <signal.h>
-#include "likely.h"
 
 struct ref_count {
 	volatile int refc;
@@ -34,7 +33,7 @@ static void ref_count_destroy(struct ref_count *ref_count)
 		_Static_assert(__builtin_types_compatible_p(typeof((ptr)->ref_count_member), struct ref_count), "type mismatch in ref_count_release()"); \
 		const int _ref_count_refc = __atomic_sub_fetch(&(ptr)->ref_count_member.refc, (int)1, __ATOMIC_SEQ_CST); \
 		if (_ref_count_refc <= 0) { \
-			if (likely(_ref_count_refc == 0)) { \
+			if (__builtin_expect(_ref_count_refc == 0, 1)) { \
 				release_routine(ptr); \
 			} else { \
 				raise(SIGSEGV); \
