@@ -1,6 +1,7 @@
 #!/bin/bash
 
 cd "${0%/*}"
+cd ..
 
 make clean
 make

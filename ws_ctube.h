@@ -18,6 +18,7 @@ struct ws_ctube;
  * @param port port for websocket server
  * @param max_nclient maximum number of websocket client connections allowed
  * @param timeout_ms timeout (ms) for server starting and websocket handshake
+ * or 0 for no timeout
  * @param max_broadcast_fps maximum number of broadcasts per second to rate
  * limit broadcasting or 0 for no limit
  */
@@ -35,6 +36,6 @@ void ws_ctube_close(struct ws_ctube *ctube);
  * @param data data to broadcast
  * @param data_size bytes of data
  */
-int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size);
+int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 
 #endif /* WS_CTUBE_H */

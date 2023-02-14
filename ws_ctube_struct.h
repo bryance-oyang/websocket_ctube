@@ -42,7 +42,7 @@ static void ws_data_destroy(struct ws_data *ws_data)
 	list_node_destroy(&ws_data->lnode);
 }
 
-static int ws_data_cp(struct ws_data *ws_data, void *data, size_t data_size)
+static int ws_data_cp(struct ws_data *ws_data, const void *data, size_t data_size)
 {
 	int retval = 0;
 

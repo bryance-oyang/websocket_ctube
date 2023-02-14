@@ -687,7 +687,7 @@ void ws_ctube_close(struct ws_ctube *ctube)
 	free(ctube);
 }
 
-int ws_ctube_broadcast(struct ws_ctube *ctube, void *data, size_t data_size)
+int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
 {
 	if (data_size == 0) {
 		return 0;
