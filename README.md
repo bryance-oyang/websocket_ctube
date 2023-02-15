@@ -9,12 +9,15 @@ handled by `ws_ctube` in separate threads.
 
 Simply include `ws_ctube.h` in your project and compile with `-pthread`.
 
+*TLS/SSL is not yet unsupported so the browser webpage trying to connect to
+`ws_ctube` cannot be served with https for now (this is a security requirement
+imposed by the WebSocket standard)*
+
 ## Requirements
 * gcc >= 4.7.0 or similar
 * POSIX stuff: `pthread` and friends (aka sorry Windows)
-* (work in progress, not yet implemented) `openssl` for TLS/SSL
 
-# Example use case
+# Example use case: heat equation visualizer
 The included demo solves the heat equation PDE in a C program and displays
 real-time simulation data in a browser HTML5 canvas.
 

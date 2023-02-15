@@ -6,10 +6,10 @@
  * also actively cooled
  */
 
-#include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <float.h>
+#include <time.h>
 #include <math.h>
 
 #include "simulation.h"
@@ -24,7 +24,7 @@ static uint8_t *img_data; // simulation grid mapped to image rgb [0,255]
 
 const int low_temperature = 600; // for color mapping
 const int high_temperature = 3000; // for color mapping
-struct blackbody_RGB_8_table blackbody_color_table;
+struct blackbody_RGB_8_table blackbody_color_table; // physically computed blackbody sRGB
 
 int simulation_init(pthread_mutex_t **data_mutex)
 {
@@ -113,7 +113,12 @@ void simulation_step(void **data, size_t *data_bytes)
 	prev_grid = tmp;
 
 	t += 1;
-	usleep(2000);
+
+	/* make simulation slow xD */
+	struct timespec sleep_time;
+	sleep_time.tv_sec = 0;
+	sleep_time.tv_nsec = 2000000;
+	nanosleep(&sleep_time, NULL);
 
 	*data = (void *)img_data;
 	*data_bytes = 3*GRID_SIDE*GRID_SIDE;
@@ -128,7 +133,7 @@ static int clip(int x, int min, int max)
 	return x;
 }
 
-/** map cell data to blackbody color */
+/** map cell data to physically computed sRGB blackbody color */
 static void mkimg()
 {
 	struct color_RGB_8 *srgb;
