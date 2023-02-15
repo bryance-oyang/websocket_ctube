@@ -46,11 +46,11 @@ static inline int color_physical_init(struct color_physical *p, size_t npoints)
 {
 	p->npoints = npoints;
 
-	p->wavelen = malloc(npoints * sizeof(*p->wavelen));
+	p->wavelen = (typeof(p->wavelen))malloc(npoints * sizeof(*p->wavelen));
 	if (p->wavelen == NULL)
 		goto err_nowavelen;
 
-	p->radiance = malloc(npoints * sizeof(*p->radiance));
+	p->radiance = (typeof(p->radiance))malloc(npoints * sizeof(*p->radiance));
 	if (p->wavelen == NULL)
 		goto err_noradiance;
 
@@ -198,12 +198,12 @@ static inline int blackbody_RGB_8_table_init(struct blackbody_RGB_8_table *restr
 
 	table->npoints = high_temperature - low_temperature + 1;
 
-	table->temperatures = malloc(table->npoints * sizeof(*table->temperatures));
+	table->temperatures = (typeof(table->temperatures))malloc(table->npoints * sizeof(*table->temperatures));
 	if (table->temperatures == NULL) {
 		goto err_notemp;
 	}
 
-	table->colors = malloc(table->npoints * sizeof(*table->colors));
+	table->colors = (typeof(table->colors))malloc(table->npoints * sizeof(*table->colors));
 	if (table->colors == NULL) {
 		goto err_nocolors;
 	}

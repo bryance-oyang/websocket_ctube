@@ -28,15 +28,15 @@ struct blackbody_RGB_8_table blackbody_color_table;
 
 int simulation_init(pthread_mutex_t **data_mutex)
 {
-	grid = malloc(GRID_SIDE*GRID_SIDE*sizeof(*grid));
+	grid = (typeof(grid))malloc(GRID_SIDE*GRID_SIDE*sizeof(*grid));
 	if (grid == NULL)
 		goto err_nogrid;
 
-	prev_grid = malloc(GRID_SIDE*GRID_SIDE*sizeof(*prev_grid));
+	prev_grid = (typeof(prev_grid))malloc(GRID_SIDE*GRID_SIDE*sizeof(*prev_grid));
 	if (prev_grid == NULL)
 		goto err_noprevgrid;
 
-	img_data = malloc(3*GRID_SIDE*GRID_SIDE*sizeof(*img_data));
+	img_data = (typeof(img_data))malloc(3*GRID_SIDE*GRID_SIDE*sizeof(*img_data));
 	if (img_data == NULL)
 		goto err_noimgdata;
 

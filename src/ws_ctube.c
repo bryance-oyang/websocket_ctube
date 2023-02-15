@@ -30,7 +30,7 @@ static void _ws_ctube_cleanup_unlock_mutex(void *mutex)
 static int _ws_ctube_connq_push(struct ws_ctube *ctube, struct ws_ctube_conn_struct *conn, enum ws_ctube_qaction act)
 {
 	int retval = 0;
-	struct ws_ctube_conn_qentry *qentry = malloc(sizeof(*qentry));
+	struct ws_ctube_conn_qentry *qentry = (typeof(qentry))malloc(sizeof(*qentry));
 
 	if (qentry == NULL) {
 		retval = -1;
@@ -308,7 +308,7 @@ static int _ws_ctube_serve_accept_new_conn(struct ws_ctube *ctube, const int ser
 	int conn_fd = accept(server_sock, NULL, NULL);
 	pthread_cleanup_push(_ws_ctube_cleanup_close_client_conn, &conn_fd);
 
-	struct ws_ctube_conn_struct *conn = malloc(sizeof(*conn));
+	struct ws_ctube_conn_struct *conn = (typeof(conn))malloc(sizeof(*conn));
 	if (conn == NULL) {
 		retval = -1;
 		goto out_noalloc;
@@ -386,7 +386,7 @@ static void *ws_ctube_server_main(void *arg)
 		goto out_nosock;
 	}
 	ctube->server_sock = server_sock;
-	pthread_cleanup_push(_ws_ctube_close_server_sock, ctube)
+	pthread_cleanup_push(_ws_ctube_close_server_sock, ctube);
 
 	/* allow reuse */
 #ifdef __linux__
@@ -545,7 +545,7 @@ struct ws_ctube* ws_ctube_open(
 		goto out_noalloc;
 	}
 
-	ctube = malloc(sizeof(*ctube));
+	ctube = (typeof(ctube))malloc(sizeof(*ctube));
 	if (ctube == NULL) {
 		err = -1;
 		goto out_noalloc;
@@ -613,7 +613,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	if (ctube->out_data != NULL) {
 		ws_ctube_ref_count_release(ctube->out_data, refc, ws_ctube_data_free);
 	}
-	ctube->out_data = malloc(sizeof(*ctube->out_data));
+	ctube->out_data = (typeof(ctube->out_data))malloc(sizeof(*ctube->out_data));
 	if (ctube->out_data == NULL) {
 		retval = -1;
 		goto out_nodata;

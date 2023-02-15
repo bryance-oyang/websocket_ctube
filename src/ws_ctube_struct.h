@@ -19,7 +19,7 @@ struct ws_ctube_data {
 static int ws_ctube_data_init(struct ws_ctube_data *ws_ctube_data, const void *data, size_t data_size)
 {
 	if (data_size > 0) {
-		ws_ctube_data->data = malloc(data_size);
+		ws_ctube_data->data = (typeof(ws_ctube_data->data))malloc(data_size);
 		if (ws_ctube_data->data == NULL) {
 			goto out_nodata;
 		}
@@ -64,7 +64,7 @@ static inline int ws_ctube_data_cp(struct ws_ctube_data *ws_ctube_data, const vo
 			free(ws_ctube_data->data);
 		}
 
-		ws_ctube_data->data = malloc(data_size);
+		ws_ctube_data->data = (typeof(ws_ctube_data->data))malloc(data_size);
 		if (ws_ctube_data->data == NULL) {
 			retval = -1;
 			goto out;
