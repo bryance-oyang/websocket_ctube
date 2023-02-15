@@ -10,11 +10,15 @@
 #ifndef WS_CTUBE_H_INTERNAL
 #define WS_CTUBE_H_INTERNAL
 
+#ifndef __cplusplus
+#include <stddef.h>
+#else /* __cplusplus*/
+#include <cstddef>
+#endif /* __cplusplus */
+
 #ifdef __cplusplus
 namespace ws_ctube {
 #endif /* __cplusplus */
-
-#include <stddef.h>
 
 struct ws_ctube;
 
