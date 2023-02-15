@@ -18,6 +18,9 @@ using namespace ws_ctube;
 
 int main()
 {
+	printf("starting websocket ctube...\n");
+	fflush(stdout);
+
 	/* ws_ctube server parameters */
 	int port = 9743;
 	int max_nclient = 100;
@@ -25,12 +28,9 @@ int main()
 	double max_broadcast_fps = 24;
 
 	/* create websocket ctube server */
-	printf("starting websocket ctube...\n");
-	fflush(stdout);
 	struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
 	if (ctube == NULL) {
 		fprintf(stderr, "websocket ctube failed to start\n");
-		fflush(stderr);
 		return -1;
 	}
 	printf("websocket ctube started :D\n");
@@ -42,7 +42,6 @@ int main()
 	size_t data_bytes;
 	if (simulation_init(&example_data_mutex) != 0) {
 		fprintf(stderr, "demo simulation failed to init\n");
-		fflush(stderr);
 		return -1;
 	}
 
