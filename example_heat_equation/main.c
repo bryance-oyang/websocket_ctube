@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief example usage of websocket ctube
+ */
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -42,13 +47,15 @@ int main()
 	}
 
 	/* example simulation main loop */
-	for (;;) {
+	for (unsigned i = 0;; i++) {
 		simulation_step(&data, &data_bytes);
 
-		/* send data to connected clients via websocket ctube */
-		pthread_mutex_lock(example_data_mutex);
-		ws_ctube_broadcast(ctube, data, data_bytes);
-		pthread_mutex_unlock(example_data_mutex);
+		/* periodically broadcast data to connected clients via websocket ctube */
+		if (i % 10 == 0) {
+			pthread_mutex_lock(example_data_mutex);
+			ws_ctube_broadcast(ctube, data, data_bytes);
+			pthread_mutex_unlock(example_data_mutex);
+		}
 	}
 
 	/* shutdown/cleanup example */

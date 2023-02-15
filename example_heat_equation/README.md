@@ -1,4 +1,4 @@
-# Demo for Websocket Ctube
+# Demo for WebSocket Ctube
 
 ## Start demo
 ```

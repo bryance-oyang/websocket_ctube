@@ -1,18 +1,16 @@
-# Websocket Ctube
-`ws_ctube` is a barebones, header-only library to make it easy for a running
-C/C++ program to share data with webpages in real-time and in a non-blocking
-manner (a simple WebSocket broadcast server). The intended use case is for high
-performance C/C++ code to be able to display its data in web browsers while
-actively running.
+# WebSocket Ctube
+`websocket_ctube` is a barebones, header-only library to enable a high
+performance C/C++ program to share its data with webpages in real-time while
+actively running (a threaded, non-blocking WebSocket broadcast server).
 
 Call `ws_ctube_broadcast()` to send arbitrary data to all connected browsers via
 the WebSocket standard.  The main C/C++ program thread can continue to run while
-the network operations are handled by `ws_ctube` in separate threads.
+the network operations are handled by `websocket_ctube` in separate threads.
 
 Simply include `ws_ctube.h` in your project and compile with `-pthread`.
 
 *TLS/SSL is not yet unsupported so the browser webpage trying to connect to
-`ws_ctube` cannot be served with https for now (this is a security requirement
+`websocket_ctube` cannot be served with https for now (this is a security requirement
 imposed by the WebSocket standard)*
 
 ## Requirements
@@ -42,7 +40,7 @@ and compile with `-pthread`
 ### C++ API
 The C++ API provides a RAII wrapper class around the C API described below.
 
-Create and start the `ws_ctube` server
+Create and start the `websocket_ctube` server
 
 ```C++
 ws_ctube::WS_Ctube ctube{port, max_nclient, timeout_ms,
@@ -119,5 +117,5 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 ```
 
 ## Internal Architecture
-WIP: This section describes the internal workings of `ws_ctube`. This is for
+WIP: This section describes the internal workings of `websocket_ctube`. This is for
 documentation purposes only and is not needed to use the API.
