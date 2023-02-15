@@ -66,6 +66,7 @@ endif
 .DEFAULT_GOAL=all
 .PHONY: all
 all: $(DEPS) $(FINAL)
+	../pkg.sh
 	@echo done
 
 .PHONY: clean
