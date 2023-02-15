@@ -7,12 +7,12 @@
 #ifndef WS_CTUBE_H
 #define WS_CTUBE_H
 
+#ifndef WS_CTUBE_H_INTERNAL
+#define WS_CTUBE_H_INTERNAL
+
 #ifdef __cplusplus
 namespace ws_ctube {
 #endif /* __cplusplus */
-
-#ifndef WS_CTUBE_H_INTERNAL
-#define WS_CTUBE_H_INTERNAL
 
 #include <stddef.h>
 
@@ -56,7 +56,13 @@ void ws_ctube_close(struct ws_ctube *ctube);
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 
 #ifdef __cplusplus
+} /* namespace ws_ctube */
+#endif /* __cplusplus */
+
+#ifdef __cplusplus
 #include <stdexcept>
+
+namespace ws_ctube {
 
 class WS_Ctube {
 public:
@@ -77,9 +83,15 @@ public:
 		return ws_ctube_broadcast(ctube, data, data_size);
 	}
 };
+
+} /* namespace ws_ctube */
 #endif /* __cplusplus */
 
 #endif /* WS_CTUBE_H_INTERNAL */
+#ifdef __cplusplus
+namespace ws_ctube {
+#endif /* __cplusplus */
+
 #include <pthread.h>
 #include <signal.h>
 #include <stddef.h>
@@ -845,7 +857,11 @@ static inline void ws_ctube_sha1_mkwords(uint32_t *const words, const uint8_t *c
 
 void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 {
+#ifndef __cplusplus
 	_Static_assert(sizeof(uint8_t) == sizeof(unsigned char), "ws_ctube_sha1sum(): unsigned char not 8 bits");
+#else /* __cplusplus */
+	static_assert(sizeof(uint8_t) == sizeof(unsigned char));
+#endif /* __cplusplus */
 
 	const uint8_t *in_byte = (uint8_t *)in;
 	uint8_t *const out_byte = (uint8_t *)out;

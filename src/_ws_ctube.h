@@ -1,6 +1,10 @@
 #ifndef WS_CTUBE_H_INTERNAL
 #define WS_CTUBE_H_INTERNAL
 
+#ifdef __cplusplus
+namespace ws_ctube {
+#endif /* __cplusplus */
+
 #include <stddef.h>
 
 struct ws_ctube;
@@ -43,7 +47,13 @@ void ws_ctube_close(struct ws_ctube *ctube);
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 
 #ifdef __cplusplus
+} /* namespace ws_ctube */
+#endif /* __cplusplus */
+
+#ifdef __cplusplus
 #include <stdexcept>
+
+namespace ws_ctube {
 
 class WS_Ctube {
 public:
@@ -64,6 +74,8 @@ public:
 		return ws_ctube_broadcast(ctube, data, data_size);
 	}
 };
+
+} /* namespace ws_ctube */
 #endif /* __cplusplus */
 
 #endif /* WS_CTUBE_H_INTERNAL */
