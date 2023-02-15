@@ -6,7 +6,6 @@
 #include <stdint.h>
 
 #include "crypt.h"
-#include "static_assert.h"
 
 static volatile int ws_ctube_b64_encode_inited = 0;
 static volatile unsigned char ws_ctube_b64_encode_table[64];

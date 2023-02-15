@@ -21,21 +21,8 @@ namespace ws_ctube {
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
-
-
-#ifndef WS_CTUBE_STATIC_ASSERT_H
-#define WS_CTUBE_STATIC_ASSERT_H
-
-#ifdef __cplusplus
-#ifndef _Static_assert
-#define _Static_assert static_assert
-#endif /* _Static_assert */
-#endif /* __cplusplus */
-
-#endif /* WS_CTUBE_STATIC_ASSERT_H */
 #ifndef WS_CTUBE_CONTAINER_OF_H
 #define WS_CTUBE_CONTAINER_OF_H
-
 
 #define ws_ctube_container_of(ptr, type, member) ({ \
 	typeof(((type *)0)->member) *_container_of_ptr = ptr; \
