@@ -1,5 +1,5 @@
-#ifndef WS_CTUBE_H_INTERNAL
-#define WS_CTUBE_H_INTERNAL
+#ifndef WS_CTUBE_H_INCLUDE
+#define WS_CTUBE_H_INCLUDE
 
 #ifndef __cplusplus
 #include <stddef.h>
@@ -82,4 +82,4 @@ public:
 } /* namespace ws_ctube */
 #endif /* __cplusplus */
 
-#endif /* WS_CTUBE_H_INTERNAL */
+#endif /* WS_CTUBE_H_INCLUDE */

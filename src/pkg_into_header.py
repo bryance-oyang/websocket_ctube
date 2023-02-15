@@ -56,7 +56,7 @@ def pkg_from(src: TextIOWrapper) -> str:
 
 def main():
     # main include
-    with open("ws_ctube_internal.h", "r") as f:
+    with open("ws_ctube_include.h", "r") as f:
         ws_ctube_h = f.read()
 
     # all other files

@@ -15,14 +15,14 @@ int main()
 {
 	/* ws_ctube server parameters */
 	int port = 9743;
-	int max_conn = 100;
+	int max_nclient = 100;
 	int timeout_ms = 0; // disable timeout
 	double max_broadcast_fps = 24;
 
 	/* create websocket ctube server */
 	printf("starting websocket ctube...\n");
 	fflush(stdout);
-	struct ws_ctube *ctube = ws_ctube_open(port, max_conn, timeout_ms, max_broadcast_fps);
+	struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
 	if (ctube == NULL) {
 		fprintf(stderr, "websocket ctube failed to start\n");
 		fflush(stderr);
