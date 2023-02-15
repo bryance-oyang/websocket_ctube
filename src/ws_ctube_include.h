@@ -14,7 +14,8 @@ namespace ws_ctube {
 struct ws_ctube;
 
 /**
- * Create a ws_ctube websocket server that must be closed with ws_ctube_close()
+ * ws_ctube_open - create a ws_ctube websocket server that must be closed with
+ * ws_ctube_close()
  *
  * @param port port for websocket server
  * @param max_nclient maximum number of websocket client connections allowed
@@ -29,14 +30,20 @@ struct ws_ctube;
 struct ws_ctube *ws_ctube_open(int port, int max_nclient, int timeout_ms, double max_broadcast_fps);
 
 /**
- * Terminate ws_ctube server and cleanup
+ * ws_ctube_close - terminate ws_ctube server and cleanup
  */
 void ws_ctube_close(struct ws_ctube *ctube);
 
 /**
- * Tries to queue data for sending to all connected websocket clients. Data is
- * copied to an internal out-buffer, then this function returns. Actual network
- * operations are handled internally by separate threads.
+ * ws_ctube_broadcast - tries to queue data for sending to all connected
+ * websocket clients. If max_broadcast_fps was nonzero when ws_ctube_open was
+ * called, this function is rate-limited accordingly.
+ *
+ * Data is copied to an internal out-buffer, then this function returns. Actual
+ * network operations are handled by separate threads.
+ *
+ * Though non-blocking, system calls performed by this function can possibly
+ * take tens of microseconds. Try not to unnecessarily call this function.
  *
  * If other threads can write to *data, get a read-lock to protect *data before
  * broadcasting. The read-lock can be released immediately once this function
