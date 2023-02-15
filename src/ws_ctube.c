@@ -12,7 +12,7 @@
 #include <string.h>
 #include <float.h>
 
-#include "_ws_ctube.h"
+#include "ws_ctube_internal.h"
 #include "ws_base.h"
 #include "ws_ctube_struct.h"
 #include "socket.h"

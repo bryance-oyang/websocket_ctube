@@ -66,21 +66,21 @@ namespace ws_ctube {
 
 class WS_Ctube {
 public:
-	struct ws_ctube *ctube;
+	struct ws_ctube *_ctube;
 
 	WS_Ctube(int port, int max_nclient, int timeout_ms, double max_broadcast_fps) {
-		ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
-		if (ctube == NULL) {
+		_ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
+		if (_ctube == NULL) {
 			throw std::runtime_error("WS_Ctube failed to start");
 		}
 	}
 
 	~WS_Ctube() {
-		ws_ctube_close(ctube);
+		ws_ctube_close(_ctube);
 	}
 
 	int broadcast(const void *data, size_t data_size) {
-		return ws_ctube_broadcast(ctube, data, data_size);
+		return ws_ctube_broadcast(_ctube, data, data_size);
 	}
 };
 
