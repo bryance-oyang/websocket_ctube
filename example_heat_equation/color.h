@@ -44,6 +44,8 @@ struct blackbody_RGB_8_table {
 
 static inline int color_physical_init(struct color_physical *p, size_t npoints)
 {
+	double slope;
+
 	p->npoints = npoints;
 
 	p->wavelen = (typeof(p->wavelen))malloc(npoints * sizeof(*p->wavelen));
@@ -56,7 +58,7 @@ static inline int color_physical_init(struct color_physical *p, size_t npoints)
 
 
 	/* interpolate wavelen 400-700 nanometers */
-	double slope = (700.0 - 400.0) / (npoints - 1);
+	slope = (700.0 - 400.0) / (npoints - 1);
 	for (size_t i = 0; i < npoints; i++) {
 		p->wavelen[i] = slope * i + 400.0;
 		p->radiance[i] = 0;
@@ -86,7 +88,7 @@ static inline double gamma_correct(double rgb_lin)
 	}
 }
 
-static inline void XYZ_normalize(struct color_XYZ *restrict c)
+static inline void XYZ_normalize(struct color_XYZ *c)
 {
 	double sum = c->XYZ[0] + c->XYZ[1] + c->XYZ[2];
 	c->XYZ[0] /= sum;
@@ -94,7 +96,7 @@ static inline void XYZ_normalize(struct color_XYZ *restrict c)
 	c->XYZ[2] /= sum;
 }
 
-static inline void XYZ_to_RGB(const struct color_XYZ *restrict in, struct color_RGB *restrict out)
+static inline void XYZ_to_RGB(const struct color_XYZ *in, struct color_RGB *out)
 {
 	double lin[3];
 	lin[0] = 3.2406 * in->XYZ[0] - 1.5372 * in->XYZ[1] - 0.4986 * in->XYZ[2];
@@ -106,7 +108,7 @@ static inline void XYZ_to_RGB(const struct color_XYZ *restrict in, struct color_
 	}
 }
 
-static inline void RGB_to_uint8(const struct color_RGB *restrict in, struct color_RGB_8 *restrict out)
+static inline void RGB_to_uint8(const struct color_RGB *in, struct color_RGB_8 *out)
 {
 	for (int i = 0; i < 3; i++) {
 		out->RGB[i] = (uint8_t)(fmin(1.0, fmax(0.0, in->RGB[i])) * 255.1);
@@ -135,7 +137,7 @@ static inline void color_xyzbar(double wavelen, double *xyzbar)
 		+ 0.681 * color_piecewise_gauss(wavelen, 459.0, 26.0, 13.8);
 }
 
-static inline void physical_to_XYZ(const struct color_physical *restrict in, struct color_XYZ *restrict out)
+static inline void physical_to_XYZ(const struct color_physical *in, struct color_XYZ *out)
 {
 	double dl;
 	double xyzbar1[3];
@@ -165,7 +167,7 @@ static inline void physical_to_XYZ(const struct color_physical *restrict in, str
 	}
 }
 
-static inline void physical_to_RGB_8(const struct color_physical *restrict in, struct color_RGB_8 *restrict out)
+static inline void physical_to_RGB_8(const struct color_physical *in, struct color_RGB_8 *out)
 {
 	struct color_XYZ XYZ;
 	struct color_RGB RGB;
@@ -175,7 +177,7 @@ static inline void physical_to_RGB_8(const struct color_physical *restrict in, s
 	RGB_to_uint8(&RGB, out);
 }
 
-static inline void blackbody_to_physical(const double temperature, struct color_physical *restrict out)
+static inline void blackbody_to_physical(const double temperature, struct color_physical *out)
 {
 	for (size_t i = 0; i < out->npoints; i++) {
 		const double l = out->wavelen[i] * 1e-9;
@@ -190,7 +192,7 @@ static inline void blackbody_to_physical(const double temperature, struct color_
 }
 
 /** make table of blackbody colors at integer increments of temperature */
-static inline int blackbody_RGB_8_table_init(struct blackbody_RGB_8_table *restrict table, int low_temperature, int high_temperature)
+static inline int blackbody_RGB_8_table_init(struct blackbody_RGB_8_table *table, int low_temperature, int high_temperature)
 {
 	if (high_temperature < low_temperature) {
 		return -1;
@@ -233,7 +235,7 @@ err_notemp:
 	return -1;
 }
 
-void blackbody_RGB_8_table_destroy(struct blackbody_RGB_8_table *restrict table)
+void blackbody_RGB_8_table_destroy(struct blackbody_RGB_8_table *table)
 {
 	free(table->temperatures);
 	free(table->colors);

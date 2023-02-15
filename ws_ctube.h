@@ -10,17 +10,17 @@ namespace ws_ctube {
 #endif /* __cplusplus */
 
 #include <stdlib.h>
-#include <stddef.h>
-#include <time.h>
 #include <signal.h>
-#include <netinet/in.h>
-#include <float.h>
-#include <unistd.h>
-#include <stdint.h>
+#include <stddef.h>
 #include <stdio.h>
-#include <pthread.h>
-#include <sys/socket.h>
+#include <unistd.h>
+#include <netinet/in.h>
 #include <string.h>
+#include <stdint.h>
+#include <sys/socket.h>
+#include <pthread.h>
+#include <float.h>
+#include <time.h>
 
 
 #ifndef WS_CTUBE_STATIC_ASSERT_H
@@ -39,7 +39,7 @@ namespace ws_ctube {
 
 #define ws_ctube_container_of(ptr, type, member) ({ \
 	typeof(((type *)0)->member) *_container_of_ptr = ptr; \
-	((type *)((void *)(_container_of_ptr) - offsetof(type, member)));})
+	((type *)((char *)(_container_of_ptr) - offsetof(type, member)));})
 
 #endif /* WS_CTUBE_CONTAINER_OF_H */
 
@@ -296,7 +296,7 @@ void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len);
 #define WS_CTUBE_SOCKET_H
 
 
-static inline int ws_ctube_send_all(int fd, char *buf, size_t len)
+static inline int ws_ctube_socket_send_all(int fd, char *buf, size_t len)
 {
 	while (len > 0) {
 		int nsent = send(fd, buf, len, MSG_NOSIGNAL);
@@ -309,7 +309,7 @@ static inline int ws_ctube_send_all(int fd, char *buf, size_t len)
 	return 0;
 }
 
-static inline int ws_ctube_recv_all(int fd, char *buf, size_t buf_size, char *delim)
+static inline int ws_ctube_socket_recv_all(int fd, char *buf, size_t buf_size, const char *delim)
 {
 	while (buf_size > 0) {
 		int nrecv = recv(fd, buf, buf_size, MSG_NOSIGNAL);
@@ -882,7 +882,7 @@ void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len_by
 #define WS_DEBUG 0
 #define WS_BUFLEN 4096
 
-static void ws_print_frame(char *prefix, char *frame, int len)
+static void ws_print_frame(const char *prefix, char *frame, int len)
 {
 	if (!WS_DEBUG) {
 		return;
@@ -932,7 +932,7 @@ int ws_send(int conn, const char *msg, size_t msg_size)
 		payld_size = ws_mkframe(frame, msg, msg_size, first);
 		const int frame_len = payld_size + WS_FRAME_HDR_SIZE;
 		ws_print_frame("ws_send()", frame, frame_len);
-		if (ws_ctube_send_all(conn, frame, frame_len) != 0) {
+		if (ws_ctube_socket_send_all(conn, frame, frame_len) != 0) {
 			return -1;
 		}
 	}
@@ -1004,6 +1004,11 @@ int ws_handshake(int conn, const struct timeval *timeout)
 	char server_key[WS_BUFLEN];
 	char response[2*WS_BUFLEN];
 
+	const char *const response_fmt = "HTTP/1.1 101 Switching Protocols\r\n"
+				"Upgrade: websocket\r\n"
+				"Connection: Upgrade\r\n"
+				"Sec-WebSocket-Accept: %s\r\n\r\n";
+
 	/* receive with timeout, but reset to old timeout afterwards */
 	struct timeval old_timeout;
 	socklen_t timeval_size = sizeof(old_timeout);
@@ -1013,7 +1018,7 @@ int ws_handshake(int conn, const struct timeval *timeout)
 	if (setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, timeout, sizeof(*timeout)) < 0) {
 		goto err;
 	}
-	if (ws_ctube_recv_all(conn, rbuf, WS_BUFLEN, "\r\n\r\n") != 0) {
+	if (ws_ctube_socket_recv_all(conn, rbuf, WS_BUFLEN, "\r\n\r\n") != 0) {
 		goto err;
 	}
 	if (setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, &old_timeout, sizeof(old_timeout)) < 0) {
@@ -1027,16 +1032,12 @@ int ws_handshake(int conn, const struct timeval *timeout)
 	client_key = ws_client_key(rbuf);
 	ws_server_response_key(server_key, client_key);
 
-	const char *const response_fmt = "HTTP/1.1 101 Switching Protocols\r\n"
-				"Upgrade: websocket\r\n"
-				"Connection: Upgrade\r\n"
-				"Sec-WebSocket-Accept: %s\r\n\r\n";
 	snprintf(response, sizeof(response)/sizeof(response[0]), response_fmt, server_key);
 	if (WS_DEBUG) {
 		printf("server response\n%s\n", response);
 	}
 
-	ws_ctube_send_all(conn, response, strlen(response));
+	ws_ctube_socket_send_all(conn, response, strlen(response));
 
 	return 0;
 
@@ -1140,7 +1141,7 @@ static void *ws_ctube_writer_main(void *arg)
 		pthread_mutex_unlock(&ctube->out_data_mutex);
 
 		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_ctube_data, out_data);
-		send_retval = ws_send(conn->fd, out_data->data, out_data->data_size);
+		send_retval = ws_send(conn->fd, (char *)out_data->data, out_data->data_size);
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_ctube_data */
 		ws_ctube_ref_count_release(out_data, refc, ws_ctube_data_free);
 

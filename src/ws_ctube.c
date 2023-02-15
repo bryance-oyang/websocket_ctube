@@ -106,7 +106,7 @@ static void *ws_ctube_writer_main(void *arg)
 		pthread_mutex_unlock(&ctube->out_data_mutex);
 
 		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_ctube_data, out_data);
-		send_retval = ws_send(conn->fd, out_data->data, out_data->data_size);
+		send_retval = ws_send(conn->fd, (char *)out_data->data, out_data->data_size);
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_ctube_data */
 		ws_ctube_ref_count_release(out_data, refc, ws_ctube_data_free);
 
