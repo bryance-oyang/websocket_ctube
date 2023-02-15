@@ -77,10 +77,10 @@ static void *ws_ctube_reader_main(void *arg)
 	return NULL;
 }
 
-static void _ws_ctube_cleanup_release_ws_data(void *arg)
+static void _ws_ctube_cleanup_release_ws_ctube_data(void *arg)
 {
-	struct ws_ctube_data *ws_data = (struct ws_ctube_data *)arg;
-	ws_ctube_ref_count_release(ws_data, refc, ws_ctube_data_free);
+	struct ws_ctube_data *ws_ctube_data = (struct ws_ctube_data *)arg;
+	ws_ctube_ref_count_release(ws_ctube_data, refc, ws_ctube_data_free);
 }
 
 static void *ws_ctube_writer_main(void *arg)
@@ -105,9 +105,9 @@ static void *ws_ctube_writer_main(void *arg)
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_unlock_mutex */
 		pthread_mutex_unlock(&ctube->out_data_mutex);
 
-		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_data, out_data);
+		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_ctube_data, out_data);
 		send_retval = ws_send(conn->fd, out_data->data, out_data->data_size);
-		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_data */
+		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_ctube_data */
 		ws_ctube_ref_count_release(out_data, refc, ws_ctube_data_free);
 
 		if (send_retval != 0) {

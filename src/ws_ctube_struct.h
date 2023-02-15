@@ -16,74 +16,74 @@ struct ws_ctube_data {
 	struct ws_ctube_ref_count refc;
 };
 
-static int ws_ctube_data_init(struct ws_ctube_data *ws_data, const void *data, size_t data_size)
+static int ws_ctube_data_init(struct ws_ctube_data *ws_ctube_data, const void *data, size_t data_size)
 {
 	if (data_size > 0) {
-		ws_data->data = malloc(data_size);
-		if (ws_data->data == NULL) {
+		ws_ctube_data->data = malloc(data_size);
+		if (ws_ctube_data->data == NULL) {
 			goto out_nodata;
 		}
 
 		if (data != NULL) {
-			memcpy(ws_data->data, data, data_size);
+			memcpy(ws_ctube_data->data, data, data_size);
 		}
 	}
 
-	ws_data->data_size = data_size;
+	ws_ctube_data->data_size = data_size;
 
-	pthread_mutex_init(&ws_data->mutex, NULL);
-	ws_ctube_list_node_init(&ws_data->lnode);
-	ws_ctube_ref_count_init(&ws_data->refc);
+	pthread_mutex_init(&ws_ctube_data->mutex, NULL);
+	ws_ctube_list_node_init(&ws_ctube_data->lnode);
+	ws_ctube_ref_count_init(&ws_ctube_data->refc);
 	return 0;
 
 out_nodata:
 	return -1;
 }
 
-static void ws_ctube_data_destroy(struct ws_ctube_data *ws_data)
+static void ws_ctube_data_destroy(struct ws_ctube_data *ws_ctube_data)
 {
-	if (ws_data->data != NULL) {
-		free(ws_data->data);
-		ws_data->data = NULL;
+	if (ws_ctube_data->data != NULL) {
+		free(ws_ctube_data->data);
+		ws_ctube_data->data = NULL;
 	}
 
-	ws_data->data_size = 0;
+	ws_ctube_data->data_size = 0;
 
-	pthread_mutex_destroy(&ws_data->mutex);
-	ws_ctube_list_node_destroy(&ws_data->lnode);
-	ws_ctube_ref_count_destroy(&ws_data->refc);
+	pthread_mutex_destroy(&ws_ctube_data->mutex);
+	ws_ctube_list_node_destroy(&ws_ctube_data->lnode);
+	ws_ctube_ref_count_destroy(&ws_ctube_data->refc);
 }
 
-static inline int ws_ctube_data_cp(struct ws_ctube_data *ws_data, const void *data, size_t data_size)
+static inline int ws_ctube_data_cp(struct ws_ctube_data *ws_ctube_data, const void *data, size_t data_size)
 {
 	int retval = 0;
 
-	pthread_mutex_lock(&ws_data->mutex);
-	if (ws_data->data_size < data_size) {
-		if (ws_data->data != NULL) {
-			free(ws_data->data);
+	pthread_mutex_lock(&ws_ctube_data->mutex);
+	if (ws_ctube_data->data_size < data_size) {
+		if (ws_ctube_data->data != NULL) {
+			free(ws_ctube_data->data);
 		}
 
-		ws_data->data = malloc(data_size);
-		if (ws_data->data == NULL) {
+		ws_ctube_data->data = malloc(data_size);
+		if (ws_ctube_data->data == NULL) {
 			retval = -1;
 			goto out;
 		}
 
-		ws_data->data_size = data_size;
+		ws_ctube_data->data_size = data_size;
 	}
 
-	memcpy(ws_data->data, data, data_size);
+	memcpy(ws_ctube_data->data, data, data_size);
 
 out:
-	pthread_mutex_unlock(&ws_data->mutex);
+	pthread_mutex_unlock(&ws_ctube_data->mutex);
 	return retval;
 }
 
-static void ws_ctube_data_free(struct ws_ctube_data *ws_data)
+static void ws_ctube_data_free(struct ws_ctube_data *ws_ctube_data)
 {
-	ws_ctube_data_destroy(ws_data);
-	free(ws_data);
+	ws_ctube_data_destroy(ws_ctube_data);
+	free(ws_ctube_data);
 }
 
 struct ws_ctube_conn_struct {
@@ -241,7 +241,7 @@ static int ws_ctube_init(
 	return 0;
 }
 
-static void _ws_data_list_clear(struct ws_ctube_list *dlist)
+static void _ws_ctube_data_list_clear(struct ws_ctube_list *dlist)
 {
 	struct ws_ctube_list_node *node;
 	struct ws_ctube_data *data;
@@ -276,7 +276,7 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	ctube->timeout_val.tv_sec = 0;
 	ctube->timeout_val.tv_usec = 0;
 
-	_ws_data_list_clear(&ctube->in_data_list);
+	_ws_ctube_data_list_clear(&ctube->in_data_list);
 	ws_ctube_list_destroy(&ctube->in_data_list);
 	ctube->in_data_pred = 0;
 	pthread_mutex_destroy(&ctube->in_data_mutex);
