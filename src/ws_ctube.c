@@ -79,15 +79,15 @@ static void *ws_ctube_reader_main(void *arg)
 
 static void _ws_ctube_cleanup_release_ws_data(void *arg)
 {
-	struct ws_data *ws_data = (struct ws_data *)arg;
-	ws_ctube_ref_count_release(ws_data, refc, ws_data_free);
+	struct ws_ctube_data *ws_data = (struct ws_ctube_data *)arg;
+	ws_ctube_ref_count_release(ws_data, refc, ws_ctube_data_free);
 }
 
 static void *ws_ctube_writer_main(void *arg)
 {
 	struct ws_ctube_conn_struct *conn = (struct ws_ctube_conn_struct *)arg;
 	struct ws_ctube *ctube = conn->ctube;
-	struct ws_data *out_data = NULL;
+	struct ws_ctube_data *out_data = NULL;
 	unsigned long out_data_id = 0;
 	int send_retval;
 
@@ -108,7 +108,7 @@ static void *ws_ctube_writer_main(void *arg)
 		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_data, out_data);
 		send_retval = ws_send(conn->fd, out_data->data, out_data->data_size);
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_data */
-		ws_ctube_ref_count_release(out_data, refc, ws_data_free);
+		ws_ctube_ref_count_release(out_data, refc, ws_ctube_data_free);
 
 		if (send_retval != 0) {
 			continue;
@@ -611,7 +611,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 
 	/* alloc new out_data */
 	if (ctube->out_data != NULL) {
-		ws_ctube_ref_count_release(ctube->out_data, refc, ws_data_free);
+		ws_ctube_ref_count_release(ctube->out_data, refc, ws_ctube_data_free);
 	}
 	ctube->out_data = malloc(sizeof(*ctube->out_data));
 	if (ctube->out_data == NULL) {
@@ -621,7 +621,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	pthread_cleanup_push(free, ctube->out_data);
 
 	/* init and memcpy into out_data */
-	if (ws_data_init(ctube->out_data, data, data_size) != 0) {
+	if (ws_ctube_data_init(ctube->out_data, data, data_size) != 0) {
 		retval = -1;
 		goto out_noinit;
 	}

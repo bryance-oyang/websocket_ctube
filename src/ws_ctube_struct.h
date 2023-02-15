@@ -7,7 +7,7 @@
 #include "ref_count.h"
 #include "list.h"
 
-struct ws_data {
+struct ws_ctube_data {
 	void *data;
 	size_t data_size;
 
@@ -16,7 +16,7 @@ struct ws_data {
 	struct ws_ctube_ref_count refc;
 };
 
-static int ws_data_init(struct ws_data *ws_data, const void *data, size_t data_size)
+static int ws_ctube_data_init(struct ws_ctube_data *ws_data, const void *data, size_t data_size)
 {
 	if (data_size > 0) {
 		ws_data->data = malloc(data_size);
@@ -40,7 +40,7 @@ out_nodata:
 	return -1;
 }
 
-static void ws_data_destroy(struct ws_data *ws_data)
+static void ws_ctube_data_destroy(struct ws_ctube_data *ws_data)
 {
 	if (ws_data->data != NULL) {
 		free(ws_data->data);
@@ -54,7 +54,7 @@ static void ws_data_destroy(struct ws_data *ws_data)
 	ws_ctube_ref_count_destroy(&ws_data->refc);
 }
 
-static inline int ws_data_cp(struct ws_data *ws_data, const void *data, size_t data_size)
+static inline int ws_ctube_data_cp(struct ws_ctube_data *ws_data, const void *data, size_t data_size)
 {
 	int retval = 0;
 
@@ -80,9 +80,9 @@ out:
 	return retval;
 }
 
-static void ws_data_free(struct ws_data *ws_data)
+static void ws_ctube_data_free(struct ws_ctube_data *ws_data)
 {
-	ws_data_destroy(ws_data);
+	ws_ctube_data_destroy(ws_data);
 	free(ws_data);
 }
 
@@ -178,7 +178,7 @@ struct ws_ctube {
 	pthread_mutex_t in_data_mutex;
 	pthread_cond_t in_data_cond;
 
-	struct ws_data *out_data;
+	struct ws_ctube_data *out_data;
 	unsigned long out_data_id;
 	pthread_mutex_t out_data_mutex;
 	pthread_cond_t out_data_cond;
@@ -244,12 +244,12 @@ static int ws_ctube_init(
 static void _ws_data_list_clear(struct ws_ctube_list *dlist)
 {
 	struct ws_ctube_list_node *node;
-	struct ws_data *data;
+	struct ws_ctube_data *data;
 
 	while ((node = ws_ctube_list_lockpop_front(dlist)) != NULL) {
 		data = ws_ctube_container_of(node, typeof(*data), lnode);
 		pthread_mutex_unlock(&node->mutex);
-		ws_data_free(data);
+		ws_ctube_data_free(data);
 	}
 }
 
@@ -283,7 +283,7 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	pthread_cond_destroy(&ctube->in_data_cond);
 
 	if (ctube->out_data != NULL) {
-		ws_ctube_ref_count_release(ctube->out_data, refc, ws_data_free);
+		ws_ctube_ref_count_release(ctube->out_data, refc, ws_ctube_data_free);
 		ctube->out_data = NULL;
 	}
 	ctube->out_data_id = 0;
