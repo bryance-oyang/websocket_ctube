@@ -380,6 +380,10 @@ void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len);
 #define WS_CTUBE_SOCKET_H
 
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 static inline int ws_ctube_socket_send_all(int fd, char *buf, size_t len)
 {
 	while (len > 0) {
