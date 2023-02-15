@@ -10,6 +10,10 @@
 #include <netinet/in.h>
 #include <stddef.h>
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0
+#endif
+
 static inline int ws_ctube_socket_send_all(int fd, char *buf, size_t len)
 {
 	while (len > 0) {
