@@ -53,6 +53,8 @@ Non-blocking broadcast to connected browsers
 ctube.broadcast(data, data_size);
 ```
 
+Server is stopped when the destructor is called.
+
 ## C API
 **Note:** in C++, the C API is namespaced into `ws_ctube::`.
 

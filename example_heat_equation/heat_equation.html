@@ -4,7 +4,11 @@
 	</head>
 	<body>
 		<h1>Websocket Ctube Demo</h1>
-		<p>Run with ./demo.sh</p>
+		<div id="loading_div">
+			<p>Run with ./demo.sh</p>
+			<p>Connecting to Websocket Ctube server...</p>
+		</div>
+
 		<p>Example use case: heat equation PDE is solved in real time with a C program.</p>
 		<p>Data is transmitted from the C program to all connected websocket clients in a non-blocking manner (via separate threads) so the main C code can continue to run during network operations.</p>
 		<p>Realtime simulation data from C program visualized below: blowtorch adds heat to metal plate which is also actively cooled.</p>
@@ -14,12 +18,16 @@
 		<p>Neat sidenote: the sRGB colors here are computed from a physical blackbody spectrum.</p>
 
 		<script lang="javascript">
+			const loading_div = document.getElementById("loading_div");
 			const canvas = document.getElementById("the_it");
 			const ctx = canvas.getContext("2d", {willReadFrequently: true});
 
 			// open websocket connection with C program matching the port
 			websocket = new WebSocket("ws://localhost:9743");
 			websocket.binaryType = "arraybuffer";
+			websocket.onopen = (event) => {
+				loading_div.style.display = "none";
+			}
 			websocket.onmessage = async (event) => {
 				// get image data transmitted by the C program
 				const data = new DataView(event.data)
@@ -33,7 +41,7 @@
 					img.data[4*i+3] = 255;
 				}
 
-				// draw C program data on HTML5 canvas
+				// draw C program data on HTML5 canvas with resizing
 				const bitmap = await createImageBitmap(img);
 				ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
 			}
