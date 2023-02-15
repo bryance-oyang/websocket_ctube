@@ -18,7 +18,7 @@ imposed by the WebSocket standard)*
 * gcc >= 4.7.0 or similar
 * POSIX stuff: `pthread` and friends (aka sorry Windows)
 
-# Example use case: heat equation visualizer
+## Example use case: heat equation visualizer
 The included demo solves the heat equation PDE in a C program and displays
 real-time simulation data in a browser HTML5 canvas.
 
@@ -32,13 +32,13 @@ then once the server has started, open a modern :) browser to
 See `main.c`, `heat_equation.html` in `example_heat_equation/` for example
 source code.
 
-# Usage
+## Usage
 ```C
 #include "ws_ctube.h"
 ```
 and compile with `-pthread`
 
-## C++ API
+### C++ API
 The C++ API provides a RAII wrapper class around the C API described below.
 
 Create and start the `ws_ctube` server
@@ -55,7 +55,7 @@ ctube.broadcast(data, data_size);
 
 Server is stopped when the destructor is called.
 
-## C API
+### C API
 **Note:** in C++, the C API is namespaced into `ws_ctube::`.
 
 ```C
@@ -67,7 +67,7 @@ ws_ctube_broadcast(ctube, data, data_size);
 ws_ctube_close(ctube);
 ```
 
-### Details
+#### Details
 ```C
 /**
  * ws_ctube_open - create a ws_ctube websocket server that must be closed with
@@ -117,6 +117,6 @@ void ws_ctube_close(struct ws_ctube *ctube);
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 ```
 
-# Internal Architecture
+## Internal Architecture
 WIP: This section describes the internal workings of `ws_ctube`. This is for
 documentation purposes only and is not needed to use the API.
