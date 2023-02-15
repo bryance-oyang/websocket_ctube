@@ -1,7 +1,7 @@
 # Websocket Ctube
-Websocket Ctube (`ws_ctube`) is a barebones, header-only library written in C
-to make it simple for a running C/C++ program to broadcast data to web browsers
-in real-time and in a non-blocking manner.
+Websocket Ctube (`ws_ctube`) is a barebones, header-only library to make it
+simple for a running C/C++ program to broadcast data to web browsers in
+real-time and in a non-blocking manner.
 
 Call `ws_ctube_broadcast()` to send data to all connected browsers. The main
 C/C++ program thread can continue to run while the network operations are
@@ -29,11 +29,10 @@ See `main.c`, `heat_equation.html` in `example_heat_equation/` for example
 source code.
 
 # Usage
-`ws_ctube` is most easily used as a header only library. Include `ws_ctube.h`
-in your project. For C++, the API is under the namespace `ws_ctube::`.
-
-Alternatively, you can compile and use as a statically linked library by running
-`make` in `src/` to generate `ws_ctube.a`
+```C
+#include "ws_ctube.h"
+```
+and compile with `-pthread`
 
 ## C++ API
 The C++ API provides a RAII wrapper class around the C API described below.

@@ -11,10 +11,9 @@
 namespace ws_ctube {
 #endif /* __cplusplus */
 
-#ifndef _WS_CTUBE_H
-#define _WS_CTUBE_H
+#ifndef WS_CTUBE_H_INTERNAL
+#define WS_CTUBE_H_INTERNAL
 
-#include <pthread.h>
 #include <stddef.h>
 
 struct ws_ctube;
@@ -80,7 +79,7 @@ public:
 };
 #endif /* __cplusplus */
 
-#endif /* _WS_CTUBE_H */
+#endif /* WS_CTUBE_H_INTERNAL */
 #include <pthread.h>
 #include <signal.h>
 #include <stddef.h>
