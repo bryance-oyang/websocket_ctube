@@ -1,5 +1,5 @@
-#ifndef CONTAINER_OF_H
-#define CONTAINER_OF_H
+#ifndef WS_CTUBE_CONTAINER_OF_H
+#define WS_CTUBE_CONTAINER_OF_H
 
 #include "static_assert.h"
 
@@ -7,4 +7,4 @@
 	typeof(((type *)0)->member) *_container_of_ptr = ptr; \
 	((type *)((void *)(_container_of_ptr) - offsetof(type, member)));})
 
-#endif /* CONTAINER_OF_H */
+#endif /* WS_CTUBE_CONTAINER_OF_H */

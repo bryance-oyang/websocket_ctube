@@ -3,8 +3,8 @@
  * @brief thread-safe doubly linked list
  */
 
-#ifndef LIST_H
-#define LIST_H
+#ifndef WS_CTUBE_LIST_H
+#define WS_CTUBE_LIST_H
 
 #include <pthread.h>
 #include <stddef.h>
@@ -191,4 +191,4 @@ static inline struct ws_ctube_list_node *ws_ctube_list_lockpop_back(struct ws_ct
 	ws_ctube_container_of(entry->member.next, typeof(*entry), member) : \
 	NULL)
 
-#endif /* LIST_H */
+#endif /* WS_CTUBE_LIST_H */

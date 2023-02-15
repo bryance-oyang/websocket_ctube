@@ -3,8 +3,8 @@
  * @brief thread-safe reference counting
  */
 
-#ifndef REF_COUNT_H
-#define REF_COUNT_H
+#ifndef WS_CTUBE_REF_COUNT_H
+#define WS_CTUBE_REF_COUNT_H
 
 #include <pthread.h>
 #include <signal.h>
@@ -41,4 +41,4 @@ static void ws_ctube_ref_count_destroy(struct ws_ctube_ref_count *ref_count)
 		} \
 	} while (0);
 
-#endif /* REF_COUNT_H */
+#endif /* WS_CTUBE_REF_COUNT_H */

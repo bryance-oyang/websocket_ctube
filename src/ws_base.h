@@ -1,5 +1,5 @@
-#ifndef WEBSOCKET_H
-#define WEBSOCKET_H
+#ifndef WS_BASE_H
+#define WS_BASE_H
 
 #include <stddef.h>
 #include <time.h>
@@ -26,4 +26,4 @@ int ws_is_ping(const char *msg, int msg_size);
 int ws_pong(int conn, const char *msg, int msg_size);
 int ws_handshake(int conn, const struct timeval *timeout);
 
-#endif /* WEBSOCKET_H */
+#endif /* WS_BASE_H */

@@ -3,8 +3,8 @@
  * @brief basic socket functions
  */
 
-#ifndef SOCKET_H
-#define SOCKET_H
+#ifndef WS_CTUBE_SOCKET_H
+#define WS_CTUBE_SOCKET_H
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -48,4 +48,4 @@ static inline int ws_ctube_bind_server(int server_sock, int port)
 	return bind(server_sock, (struct sockaddr *)&sa, sizeof(sa));
 }
 
-#endif /* SOCKET_H */
+#endif /* WS_CTUBE_SOCKET_H */

@@ -3,8 +3,8 @@
  * @brief compile time assertion
  */
 
-#ifndef STATIC_ASSERT_H
-#define STATIC_ASSERT_H
+#ifndef WS_CTUBE_STATIC_ASSERT_H
+#define WS_CTUBE_STATIC_ASSERT_H
 
 #ifdef __cplusplus
 #ifndef _Static_assert
@@ -12,4 +12,4 @@
 #endif /* _Static_assert */
 #endif /* __cplusplus */
 
-#endif /* STATIC_ASSERT_H */
+#endif /* WS_CTUBE_STATIC_ASSERT_H */
