@@ -74,7 +74,7 @@ void simulation_destroy()
 	pthread_mutex_destroy(&img_mutex);
 }
 
-static inline float heat_src(float t, int i, int j)
+static float heat_src(float t, int i, int j)
 {
 	float icenter = GRID_SIDE * (0.5 + 0.3*cosf(1.9*t / GRID_SIDE));
 	float jcenter = GRID_SIDE * (0.5 + 0.3*sinf(1.5*t / GRID_SIDE));
@@ -82,7 +82,7 @@ static inline float heat_src(float t, int i, int j)
 		* expf(-(SQR(i - icenter) + SQR(j - jcenter)) / (2 * SQR(GRID_SIDE/25)));
 }
 
-static inline void mkimg();
+static void mkimg();
 
 void simulation_step(void **data, size_t *data_bytes)
 {
@@ -119,21 +119,7 @@ void simulation_step(void **data, size_t *data_bytes)
 	*data_bytes = 3*GRID_SIDE*GRID_SIDE;
 }
 
-static inline void get_minmax_cell(float *min, float *max)
-{
-	*min = FLT_MAX;
-	*max = -FLT_MAX;
-	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
-		if (grid[i] < *min) {
-			*min = grid[i];
-		}
-		if (grid[i] > *max) {
-			*max = grid[i];
-		}
-	}
-}
-
-static inline int clip(int x, int min, int max)
+static int clip(int x, int min, int max)
 {
 	if (x < min)
 		return min;
@@ -143,7 +129,7 @@ static inline int clip(int x, int min, int max)
 }
 
 /** map cell data to blackbody color */
-static inline void mkimg()
+static void mkimg()
 {
 	struct color_RGB_8 *srgb;
 	const float min = 0;
