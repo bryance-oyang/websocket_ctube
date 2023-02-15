@@ -99,7 +99,7 @@ headers: $(HDRS:.h=.h.gch)
 dox: Doxyfile
 	doxygen Doxyfile
 
-$(FINAL): $(OBJS) ws_ctube.a
+$(FINAL): $(OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c

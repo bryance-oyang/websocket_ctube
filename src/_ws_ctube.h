@@ -9,7 +9,6 @@
 #include <pthread.h>
 #include <stddef.h>
 
-/** defined in ws_ctube_struct.h */
 struct ws_ctube;
 
 /**
