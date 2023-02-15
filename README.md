@@ -1,8 +1,9 @@
 # Websocket Ctube
 `ws_ctube` is a barebones, header-only library to make it easy for a running
 C/C++ program to share data with webpages in real-time and in a non-blocking
-manner. An intended use case is for high performance C/C++ code to be able to
-display its data in web browsers while actively running.
+manner (a simple WebSocket broadcast server). The intended use case is for high
+performance C/C++ code to be able to display its data in web browsers while
+actively running.
 
 Call `ws_ctube_broadcast()` to send arbitrary data to all connected browsers via
 the WebSocket standard.  The main C/C++ program thread can continue to run while
