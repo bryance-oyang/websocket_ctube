@@ -1,12 +1,13 @@
 """
+Run from ../pkg.sh
+
 Reads src code from src/ and packages into single header file ws_ctube.h
 """
 
 from io import TextIOWrapper
 import re
 
-SRC_DIR = "src"
-DEST_HEADER = "ws_ctube.h"
+DEST_HEADER = "../ws_ctube.h"
 
 file_list = [
     "static_assert.h",
@@ -25,7 +26,8 @@ file_list = [
     "ws_ctube.c",
 ]
 
-system_include = set()
+system_include = []
+system_include_set = set()
 
 def system_include_str() -> str:
     result = ""
@@ -41,7 +43,9 @@ def pkg_from(src: TextIOWrapper) -> str:
         if line.startswith("#include <"):
             # put #include <...> into set
             system_hdr = line.split("#include <")[1].split(">")[0]
-            system_include.add(system_hdr)
+            if system_hdr not in system_include_set:
+                system_include_set.add(system_hdr)
+                system_include.append(system_hdr)
         elif line.startswith("#include \""):
             # remove #include "...""
             pass
@@ -54,14 +58,14 @@ def pkg_from(src: TextIOWrapper) -> str:
 def main():
     code = ""
     for fname in file_list:
-        with open(f"{SRC_DIR}/{fname}", "r") as f:
+        with open(fname, "r") as f:
             code += pkg_from(f)
 
     # remove /** */ comments
     code = re.sub(r"/\*\*.*?\*/", "", code, flags=re.DOTALL)
 
     # final include
-    with open(f"{SRC_DIR}/_ws_ctube.h", "r") as f:
+    with open("_ws_ctube.h", "r") as f:
         code += pkg_from(f)
 
     with open(DEST_HEADER, "w") as hfile:
