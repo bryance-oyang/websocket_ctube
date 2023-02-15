@@ -71,7 +71,7 @@ public:
 	WS_Ctube(int port, int max_nclient, int timeout_ms, double max_broadcast_fps) {
 		_ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
 		if (_ctube == NULL) {
-			throw std::runtime_error("WS_Ctube failed to start");
+			throw ::std::runtime_error("WS_Ctube failed to start");
 		}
 	}
 
@@ -859,8 +859,6 @@ void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len_by
 {
 #ifndef __cplusplus
 	_Static_assert(sizeof(uint8_t) == sizeof(unsigned char), "ws_ctube_sha1sum(): unsigned char not 8 bits");
-#else /* __cplusplus */
-	static_assert(sizeof(uint8_t) == sizeof(unsigned char));
 #endif /* __cplusplus */
 
 	const uint8_t *in_byte = (uint8_t *)in;

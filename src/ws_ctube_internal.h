@@ -62,7 +62,7 @@ public:
 	WS_Ctube(int port, int max_nclient, int timeout_ms, double max_broadcast_fps) {
 		_ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
 		if (_ctube == NULL) {
-			throw std::runtime_error("WS_Ctube failed to start");
+			throw ::std::runtime_error("WS_Ctube failed to start");
 		}
 	}
 
