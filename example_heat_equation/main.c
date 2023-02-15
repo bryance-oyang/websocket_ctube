@@ -28,7 +28,7 @@ int main()
 		fflush(stderr);
 		return -1;
 	}
-	printf("websocket ctube started :D\n\n");
+	printf("websocket ctube started :D\n");
 	fflush(stdout);
 
 	/* start example simulation */

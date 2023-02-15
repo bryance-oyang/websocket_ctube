@@ -7,6 +7,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <float.h>
 #include <time.h>
@@ -62,6 +63,7 @@ err_noimgdata:
 err_noprevgrid:
 	free(grid);
 err_nogrid:
+	perror("simulation_init()");
 	return -1;
 }
 
