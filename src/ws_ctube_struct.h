@@ -115,7 +115,11 @@ static int ws_ctube_conn_struct_init(struct ws_ctube_conn_struct *conn, int fd, 
 
 static void ws_ctube_conn_struct_destroy(struct ws_ctube_conn_struct *conn)
 {
+	int oldstate, statevar;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 	close(conn->fd);
+	pthread_setcancelstate(oldstate, &statevar);
+
 	conn->fd = -1;
 	conn->ctube = NULL;
 

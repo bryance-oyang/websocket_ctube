@@ -120,26 +120,26 @@ static void *ws_ctube_writer_main(void *arg)
 
 static void _ws_ctube_cancel_reader(void *arg)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	struct ws_ctube_conn_struct *conn = (struct ws_ctube_conn_struct *)arg;
 	pthread_cancel(conn->reader_tid);
 	pthread_join(conn->reader_tid, NULL);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static void _ws_ctube_cancel_writer(void *arg)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	struct ws_ctube_conn_struct *conn = (struct ws_ctube_conn_struct *)arg;
 	pthread_cancel(conn->writer_tid);
 	pthread_join(conn->writer_tid, NULL);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static int ws_ctube_conn_struct_start(struct ws_ctube_conn_struct *conn)
@@ -169,7 +169,7 @@ out_noreader:
 
 static void ws_ctube_conn_struct_stop(struct ws_ctube_conn_struct *conn)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	pthread_cancel(conn->reader_tid);
@@ -178,7 +178,7 @@ static void ws_ctube_conn_struct_stop(struct ws_ctube_conn_struct *conn)
 	pthread_join(conn->reader_tid, NULL);
 	pthread_join(conn->writer_tid, NULL);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static void _ws_ctube_conn_list_add(struct ws_ctube_list *conn_list, struct ws_ctube_conn_struct *conn)
@@ -242,7 +242,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 
 static void _ws_ctube_cleanup_conn_list(void *arg)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	struct ws_ctube_list *conn_list = (struct ws_ctube_list *)arg;
@@ -265,7 +265,7 @@ static void _ws_ctube_cleanup_conn_list(void *arg)
 		ws_ctube_ref_count_release(conn, refc, ws_ctube_conn_struct_free);
 	}
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static void *ws_ctube_handler_main(void *arg)
@@ -295,10 +295,15 @@ static void *ws_ctube_handler_main(void *arg)
 
 static void _ws_ctube_cleanup_close_client_conn(void *arg)
 {
+	int oldstate, statevar;
+	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+
 	int *fd = (int *)arg;
 	if (*fd >= 0) {
 		close(*fd);
 	}
+
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static int _ws_ctube_serve_accept_new_conn(struct ws_ctube *ctube, const int server_sock)
@@ -351,7 +356,7 @@ static void ws_ctube_serve_forever(struct ws_ctube *ctube)
 
 static void _ws_ctube_server_init_fail(void *arg)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
@@ -360,18 +365,18 @@ static void _ws_ctube_server_init_fail(void *arg)
 	pthread_mutex_unlock(&ctube->server_init_mutex);
 	pthread_cond_signal(&ctube->server_init_cond);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static void _ws_ctube_close_server_sock(void *arg)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	close(ctube->server_sock);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static void *ws_ctube_server_main(void *arg)
@@ -429,26 +434,26 @@ out_nosock:
 
 static void _ws_ctube_cancel_handler(void *arg)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	pthread_cancel(ctube->handler_tid);
 	pthread_join(ctube->handler_tid, NULL);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static void _ws_ctube_cancel_server(void *arg)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
 	pthread_cancel(ctube->server_tid);
 	pthread_join(ctube->server_tid, NULL);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 static int ws_ctube_start(struct ws_ctube *ctube)
@@ -498,7 +503,7 @@ out_nohandler:
 
 static void ws_ctube_stop(struct ws_ctube *ctube)
 {
-	int oldstate;
+	int oldstate, statevar;
 	pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
 
 	pthread_cancel(ctube->handler_tid);
@@ -507,7 +512,7 @@ static void ws_ctube_stop(struct ws_ctube *ctube)
 	pthread_join(ctube->handler_tid, NULL);
 	pthread_join(ctube->server_tid, NULL);
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+	pthread_setcancelstate(oldstate, &statevar);
 }
 
 struct ws_ctube* ws_ctube_open(

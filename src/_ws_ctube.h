@@ -1,10 +1,5 @@
-/**
- * @file
- * @brief The main include file for ws_ctube
- */
-
-#ifndef WS_CTUBE_H
-#define WS_CTUBE_H
+#ifndef _WS_CTUBE_H
+#define _WS_CTUBE_H
 
 #include <pthread.h>
 #include <stddef.h>
@@ -48,4 +43,28 @@ void ws_ctube_close(struct ws_ctube *ctube);
  */
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 
-#endif /* WS_CTUBE_H */
+#ifdef __cplusplus
+#include <stdexcept>
+
+class WS_Ctube {
+public:
+	struct ws_ctube *ctube;
+
+	WS_Ctube(int port, int max_nclient, int timeout_ms, double max_broadcast_fps) {
+		ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
+		if (ctube == NULL) {
+			throw std::runtime_error("WS_Ctube failed to start");
+		}
+	}
+
+	~WS_Ctube() {
+		ws_ctube_close(ctube);
+	}
+
+	int broadcast(const void *data, size_t data_size) {
+		return ws_ctube_broadcast(ctube, data, data_size);
+	}
+};
+#endif /* __cplusplus */
+
+#endif /* _WS_CTUBE_H */
