@@ -89,11 +89,14 @@ void ws_ctube_close(struct ws_ctube *ctube);
 
 /**
  * ws_ctube_broadcast - tries to queue data for sending to all connected
- * websocket clients. If max_broadcast_fps was nonzero when ws_ctube_open was
- * called, this function is rate-limited accordingly.
+ * websocket clients.
+ *
+ * If max_broadcast_fps was nonzero when ws_ctube_open was called, this function
+ * is rate-limited accordingly and returns failure if called too soon.
  *
  * Data is copied to an internal out-buffer, then this function returns. Actual
- * network operations are handled by separate threads.
+ * network operations will be handled internally and opaquely by separate
+ * threads.
  *
  * Though non-blocking, system calls performed by this function can possibly
  * take tens of microseconds. Try not to unnecessarily call this function.
