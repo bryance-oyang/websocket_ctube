@@ -12,8 +12,8 @@ struct ws_data {
 	size_t data_size;
 
 	pthread_mutex_t mutex;
-	struct list_node lnode;
-	struct ref_count refc;
+	struct ws_ctube_list_node lnode;
+	struct ws_ctube_ref_count refc;
 };
 
 static int ws_data_init(struct ws_data *ws_data, const void *data, size_t data_size)
@@ -32,8 +32,8 @@ static int ws_data_init(struct ws_data *ws_data, const void *data, size_t data_s
 	ws_data->data_size = data_size;
 
 	pthread_mutex_init(&ws_data->mutex, NULL);
-	list_node_init(&ws_data->lnode);
-	ref_count_init(&ws_data->refc);
+	ws_ctube_list_node_init(&ws_data->lnode);
+	ws_ctube_ref_count_init(&ws_data->refc);
 	return 0;
 
 out_nodata:
@@ -50,8 +50,8 @@ static void ws_data_destroy(struct ws_data *ws_data)
 	ws_data->data_size = 0;
 
 	pthread_mutex_destroy(&ws_data->mutex);
-	list_node_destroy(&ws_data->lnode);
-	ref_count_destroy(&ws_data->refc);
+	ws_ctube_list_node_destroy(&ws_data->lnode);
+	ws_ctube_ref_count_destroy(&ws_data->refc);
 }
 
 static inline int ws_data_cp(struct ws_data *ws_data, const void *data, size_t data_size)
@@ -86,7 +86,7 @@ static void ws_data_free(struct ws_data *ws_data)
 	free(ws_data);
 }
 
-struct conn_struct {
+struct ws_ctube_conn_struct {
 	int fd;
 	struct ws_ctube *ctube;
 
@@ -96,11 +96,11 @@ struct conn_struct {
 	pthread_t reader_tid;
 	pthread_t writer_tid;
 
-	struct ref_count refc;
-	struct list_node lnode;
+	struct ws_ctube_ref_count refc;
+	struct ws_ctube_list_node lnode;
 };
 
-static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *ctube)
+static int ws_ctube_conn_struct_init(struct ws_ctube_conn_struct *conn, int fd, struct ws_ctube *ctube)
 {
 	conn->fd = fd;
 	conn->ctube = ctube;
@@ -108,12 +108,12 @@ static int conn_struct_init(struct conn_struct *conn, int fd, struct ws_ctube *c
 	conn->stopping = 0;
 	pthread_mutex_init(&conn->stopping_mutex, NULL);
 
-	ref_count_init(&conn->refc);
-	list_node_init(&conn->lnode);
+	ws_ctube_ref_count_init(&conn->refc);
+	ws_ctube_list_node_init(&conn->lnode);
 	return 0;
 }
 
-static void conn_struct_destroy(struct conn_struct *conn)
+static void ws_ctube_conn_struct_destroy(struct ws_ctube_conn_struct *conn)
 {
 	close(conn->fd);
 	conn->fd = -1;
@@ -122,46 +122,46 @@ static void conn_struct_destroy(struct conn_struct *conn)
 	conn->stopping = 0;
 	pthread_mutex_destroy(&conn->stopping_mutex);
 
-	ref_count_destroy(&conn->refc);
-	list_node_destroy(&conn->lnode);
+	ws_ctube_ref_count_destroy(&conn->refc);
+	ws_ctube_list_node_destroy(&conn->lnode);
 }
 
-static void conn_struct_free(struct conn_struct *conn)
+static void ws_ctube_conn_struct_free(struct ws_ctube_conn_struct *conn)
 {
-	conn_struct_destroy(conn);
+	ws_ctube_conn_struct_destroy(conn);
 	free(conn);
 }
 
-enum qaction {
-	WS_CONN_START,
-	WS_CONN_STOP
+enum ws_ctube_qaction {
+	WS_CTUBE_CONN_START,
+	WS_CTUBE_CONN_STOP
 };
 
-struct conn_qentry {
-	struct conn_struct *conn;
-	enum qaction act;
-	struct list_node lnode;
+struct ws_ctube_conn_qentry {
+	struct ws_ctube_conn_struct *conn;
+	enum ws_ctube_qaction act;
+	struct ws_ctube_list_node lnode;
 };
 
-static int conn_qentry_init(struct conn_qentry *qentry, struct conn_struct *conn, enum qaction act)
+static int ws_ctube_conn_qentry_init(struct ws_ctube_conn_qentry *qentry, struct ws_ctube_conn_struct *conn, enum ws_ctube_qaction act)
 {
-	ref_count_acquire(conn, refc);
+	ws_ctube_ref_count_acquire(conn, refc);
 	qentry->conn = conn;
 	qentry->act = act;
-	list_node_init(&qentry->lnode);
+	ws_ctube_list_node_init(&qentry->lnode);
 	return 0;
 }
 
-static void conn_qentry_destroy(struct conn_qentry *qentry)
+static void ws_ctube_conn_qentry_destroy(struct ws_ctube_conn_qentry *qentry)
 {
-	ref_count_release(qentry->conn, refc, conn_struct_free);
+	ws_ctube_ref_count_release(qentry->conn, refc, ws_ctube_conn_struct_free);
 	qentry->conn = NULL;
-	list_node_destroy(&qentry->lnode);
+	ws_ctube_list_node_destroy(&qentry->lnode);
 }
 
-static void conn_qentry_free(struct conn_qentry *qentry)
+static void ws_ctube_conn_qentry_free(struct ws_ctube_conn_qentry *qentry)
 {
-	conn_qentry_destroy(qentry);
+	ws_ctube_conn_qentry_destroy(qentry);
 	free(qentry);
 }
 
@@ -173,7 +173,7 @@ struct ws_ctube {
 	struct timespec timeout_spec;
 	struct timeval timeout_val;
 
-	struct list in_data_list;
+	struct ws_ctube_list in_data_list;
 	int in_data_pred;
 	pthread_mutex_t in_data_mutex;
 	pthread_cond_t in_data_cond;
@@ -186,7 +186,7 @@ struct ws_ctube {
 	double max_bcast_fps;
 	struct timespec prev_bcast_time;
 
-	struct list connq;
+	struct ws_ctube_list connq;
 	int connq_pred;
 	pthread_mutex_t connq_mutex;
 	pthread_cond_t connq_cond;
@@ -215,7 +215,7 @@ static int ws_ctube_init(
 	ctube->timeout_val.tv_sec = timeout_ms / 1000;
 	ctube->timeout_val.tv_usec = (timeout_ms % 1000) * 1000;
 
-	list_init(&ctube->in_data_list);
+	ws_ctube_list_init(&ctube->in_data_list);
 	ctube->in_data_pred = 0;
 	pthread_mutex_init(&ctube->in_data_mutex, NULL);
 	pthread_cond_init(&ctube->in_data_cond, NULL);
@@ -229,7 +229,7 @@ static int ws_ctube_init(
 	ctube->prev_bcast_time.tv_sec = 0;
 	ctube->prev_bcast_time.tv_nsec = 0;
 
-	list_init(&ctube->connq);
+	ws_ctube_list_init(&ctube->connq);
 	ctube->connq_pred = 0;
 	pthread_mutex_init(&ctube->connq_mutex, NULL);
 	pthread_cond_init(&ctube->connq_cond, NULL);
@@ -241,27 +241,27 @@ static int ws_ctube_init(
 	return 0;
 }
 
-static void _ws_data_list_clear(struct list *dlist)
+static void _ws_data_list_clear(struct ws_ctube_list *dlist)
 {
-	struct list_node *node;
+	struct ws_ctube_list_node *node;
 	struct ws_data *data;
 
-	while ((node = list_lockpop_front(dlist)) != NULL) {
-		data = container_of(node, typeof(*data), lnode);
+	while ((node = ws_ctube_list_lockpop_front(dlist)) != NULL) {
+		data = ws_ctube_container_of(node, typeof(*data), lnode);
 		pthread_mutex_unlock(&node->mutex);
 		ws_data_free(data);
 	}
 }
 
-static void _connq_clear(struct list *connq)
+static void _ws_ctube_connq_clear(struct ws_ctube_list *connq)
 {
-	struct list_node *node;
-	struct conn_qentry *qentry;
+	struct ws_ctube_list_node *node;
+	struct ws_ctube_conn_qentry *qentry;
 
-	while ((node = list_lockpop_front(connq)) != NULL) {
-		qentry = container_of(node, typeof(*qentry), lnode);
+	while ((node = ws_ctube_list_lockpop_front(connq)) != NULL) {
+		qentry = ws_ctube_container_of(node, typeof(*qentry), lnode);
 		pthread_mutex_unlock(&node->mutex);
-		conn_qentry_free(qentry);
+		ws_ctube_conn_qentry_free(qentry);
 	}
 }
 
@@ -277,13 +277,13 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	ctube->timeout_val.tv_usec = 0;
 
 	_ws_data_list_clear(&ctube->in_data_list);
-	list_destroy(&ctube->in_data_list);
+	ws_ctube_list_destroy(&ctube->in_data_list);
 	ctube->in_data_pred = 0;
 	pthread_mutex_destroy(&ctube->in_data_mutex);
 	pthread_cond_destroy(&ctube->in_data_cond);
 
 	if (ctube->out_data != NULL) {
-		ref_count_release(ctube->out_data, refc, ws_data_free);
+		ws_ctube_ref_count_release(ctube->out_data, refc, ws_data_free);
 		ctube->out_data = NULL;
 	}
 	ctube->out_data_id = 0;
@@ -294,8 +294,8 @@ static void ws_ctube_destroy(struct ws_ctube *ctube)
 	ctube->prev_bcast_time.tv_sec = 0;
 	ctube->prev_bcast_time.tv_nsec = 0;
 
-	_connq_clear(&ctube->connq);
-	list_destroy(&ctube->connq);
+	_ws_ctube_connq_clear(&ctube->connq);
+	ws_ctube_list_destroy(&ctube->connq);
 	ctube->connq_pred = 0;
 	pthread_mutex_destroy(&ctube->connq_mutex);
 	pthread_cond_destroy(&ctube->connq_cond);

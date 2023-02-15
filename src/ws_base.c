@@ -69,7 +69,7 @@ int ws_send(int conn, const char *msg, size_t msg_size)
 		payld_size = ws_mkframe(frame, msg, msg_size, first);
 		const int frame_len = payld_size + WS_FRAME_HDR_SIZE;
 		ws_print_frame("ws_send()", frame, frame_len);
-		if (send_all(conn, frame, frame_len) != 0) {
+		if (ws_ctube_send_all(conn, frame, frame_len) != 0) {
 			return -1;
 		}
 	}
@@ -128,8 +128,8 @@ static int ws_server_response_key(char *server_key, const char *client_key)
 		WS_BUFLEN - strlen(magic_client_key) - 1);
 	magic_client_key[WS_BUFLEN - 1] = '\0';
 
-	sha1sum((unsigned char *)client_sha1, (unsigned char *)magic_client_key, strlen(magic_client_key));
-	b64_encode((unsigned char *)server_key, (unsigned char *)client_sha1, sha1_hash_len);
+	ws_ctube_sha1sum((unsigned char *)client_sha1, (unsigned char *)magic_client_key, strlen(magic_client_key));
+	ws_ctube_b64_encode((unsigned char *)server_key, (unsigned char *)client_sha1, sha1_hash_len);
 
 	return 0;
 }
@@ -150,7 +150,7 @@ int ws_handshake(int conn, const struct timeval *timeout)
 	if (setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, timeout, sizeof(*timeout)) < 0) {
 		goto err;
 	}
-	if (recv_all(conn, rbuf, WS_BUFLEN, "\r\n\r\n") != 0) {
+	if (ws_ctube_recv_all(conn, rbuf, WS_BUFLEN, "\r\n\r\n") != 0) {
 		goto err;
 	}
 	if (setsockopt(conn, SOL_SOCKET, SO_RCVTIMEO, &old_timeout, sizeof(old_timeout)) < 0) {
@@ -173,7 +173,7 @@ int ws_handshake(int conn, const struct timeval *timeout)
 		printf("server response\n%s\n", response);
 	}
 
-	send_all(conn, response, strlen(response));
+	ws_ctube_send_all(conn, response, strlen(response));
 
 	return 0;
 

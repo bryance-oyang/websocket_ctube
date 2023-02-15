@@ -10,13 +10,13 @@
 #include <stddef.h>
 #include "container_of.h"
 
-struct list_node {
-	struct list_node *prev;
-	struct list_node *next;
+struct ws_ctube_list_node {
+	struct ws_ctube_list_node *prev;
+	struct ws_ctube_list_node *next;
 	pthread_mutex_t mutex;
 };
 
-static int list_node_init(struct list_node *node)
+static int ws_ctube_list_node_init(struct ws_ctube_list_node *node)
 {
 	node->prev = NULL;
 	node->next = NULL;
@@ -24,22 +24,22 @@ static int list_node_init(struct list_node *node)
 	return 0;
 }
 
-static void list_node_destroy(struct list_node *node)
+static void ws_ctube_list_node_destroy(struct ws_ctube_list_node *node)
 {
 	node->prev = NULL;
 	node->next = NULL;
 	pthread_mutex_destroy(&node->mutex);
 }
 
-struct list {
-	struct list_node head;
+struct ws_ctube_list {
+	struct ws_ctube_list_node head;
 	int len;
 	pthread_mutex_t mutex;
 };
 
-static int list_init(struct list *l)
+static int ws_ctube_list_init(struct ws_ctube_list *l)
 {
-	list_node_init(&l->head);
+	ws_ctube_list_node_init(&l->head);
 	l->head.next = &l->head;
 	l->head.prev = &l->head;
 	l->len = 0;
@@ -47,13 +47,13 @@ static int list_init(struct list *l)
 	return 0;
 }
 
-static void list_destroy(struct list *l)
+static void ws_ctube_list_destroy(struct ws_ctube_list *l)
 {
-	list_node_destroy(&l->head);
+	ws_ctube_list_node_destroy(&l->head);
 	pthread_mutex_destroy(&l->mutex);
 }
 
-static void _list_add_after(struct list_node *prior, struct list_node *new_node)
+static void _ws_ctube_list_add_after(struct ws_ctube_list_node *prior, struct ws_ctube_list_node *new_node)
 {
 	new_node->prev = prior;
 	new_node->next = prior->next;
@@ -61,7 +61,7 @@ static void _list_add_after(struct list_node *prior, struct list_node *new_node)
 	prior->next = new_node;
 }
 
-static void _list_node_unlink(struct list_node *node)
+static void _ws_ctube_list_node_unlink(struct ws_ctube_list_node *node)
 {
 	node->next->prev = node->prev;
 	node->prev->next = node->next;
@@ -69,17 +69,17 @@ static void _list_node_unlink(struct list_node *node)
 	node->prev = NULL;
 }
 
-static inline void list_unlink(struct list *l, struct list_node *node)
+static inline void ws_ctube_list_unlink(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
-	_list_node_unlink(node);
+	_ws_ctube_list_node_unlink(node);
 	l->len--;
 	pthread_mutex_unlock(&l->mutex);
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static inline void list_push_front(struct list *l, struct list_node *node)
+static inline void ws_ctube_list_push_front(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
@@ -87,7 +87,7 @@ static inline void list_push_front(struct list *l, struct list_node *node)
 	if (node->next != NULL || node->prev != NULL) {
 		goto out;
 	}
-	_list_add_after(&l->head, node);
+	_ws_ctube_list_add_after(&l->head, node);
 	l->len++;
 
 out:
@@ -95,7 +95,7 @@ out:
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static inline void list_push_back(struct list *l, struct list_node *node)
+static inline void ws_ctube_list_push_back(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
@@ -103,7 +103,7 @@ static inline void list_push_back(struct list *l, struct list_node *node)
 	if (node->next != NULL || node->prev != NULL) {
 		goto out;
 	}
-	_list_add_after(l->head.prev, node);
+	_ws_ctube_list_add_after(l->head.prev, node);
 	l->len++;
 
 out:
@@ -114,9 +114,9 @@ out:
 /**
  * pops and returns locked node
  */
-static inline struct list_node *list_lockpop_front(struct list *l)
+static inline struct ws_ctube_list_node *ws_ctube_list_lockpop_front(struct ws_ctube_list *l)
 {
-	struct list_node *front;
+	struct ws_ctube_list_node *front;
 
 	/* optimistically lock front mutex but check front is still front */
 	for (;;) {
@@ -137,7 +137,7 @@ static inline struct list_node *list_lockpop_front(struct list *l)
 		}
 	}
 
-	_list_node_unlink(front);
+	_ws_ctube_list_node_unlink(front);
 	l->len--;
 	pthread_mutex_unlock(&l->mutex);
 	return front;
@@ -146,9 +146,9 @@ static inline struct list_node *list_lockpop_front(struct list *l)
 /**
  * pops and returns locked node
  */
-static inline struct list_node *list_lockpop_back(struct list *l)
+static inline struct ws_ctube_list_node *ws_ctube_list_lockpop_back(struct ws_ctube_list *l)
 {
-	struct list_node *back;
+	struct ws_ctube_list_node *back;
 
 	/* optimistically lock back mutex but check back is still back */
 	for (;;) {
@@ -169,26 +169,26 @@ static inline struct list_node *list_lockpop_back(struct list *l)
 		}
 	}
 
-	_list_node_unlink(back);
+	_ws_ctube_list_node_unlink(back);
 	l->len--;
 	pthread_mutex_unlock(&l->mutex);
 	return back;
 }
 
-#define list_for_each(list, node) \
+#define ws_ctube_list_for_each(list, node) \
 	for ( \
 	node = (list)->head.next; \
 	node != &((list)->head); \
 	node = node->next)
 
-#define list_for_each_entry(list, entry, member) \
+#define ws_ctube_list_for_each_entry(list, entry, member) \
 	for ( \
 	entry = (list)->head.next != &((list)->head) ? \
-	container_of((list)->head.next, typeof(*entry), member) : \
+	ws_ctube_container_of((list)->head.next, typeof(*entry), member) : \
 	NULL; \
 	entry != NULL; \
 	entry = entry->member.next != &((list)->head) ? \
-	container_of(entry->member.next, typeof(*entry), member) : \
+	ws_ctube_container_of(entry->member.next, typeof(*entry), member) : \
 	NULL)
 
 #endif /* LIST_H */

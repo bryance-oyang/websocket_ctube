@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 #include <stddef.h>
 
-static inline int send_all(int fd, char *buf, size_t len)
+static inline int ws_ctube_send_all(int fd, char *buf, size_t len)
 {
 	while (len > 0) {
 		int nsent = send(fd, buf, len, MSG_NOSIGNAL);
@@ -23,7 +23,7 @@ static inline int send_all(int fd, char *buf, size_t len)
 	return 0;
 }
 
-static inline int recv_all(int fd, char *buf, size_t buf_size, char *delim)
+static inline int ws_ctube_recv_all(int fd, char *buf, size_t buf_size, char *delim)
 {
 	while (buf_size > 0) {
 		int nrecv = recv(fd, buf, buf_size, MSG_NOSIGNAL);
@@ -39,7 +39,7 @@ static inline int recv_all(int fd, char *buf, size_t buf_size, char *delim)
 	return 0;
 }
 
-static inline int bind_server(int server_sock, int port)
+static inline int ws_ctube_bind_server(int server_sock, int port)
 {
 	struct sockaddr_in sa;
 	sa.sin_family = AF_INET;

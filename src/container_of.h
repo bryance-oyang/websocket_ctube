@@ -3,7 +3,7 @@
 
 #include "static_assert.h"
 
-#define container_of(ptr, type, member) ({ \
+#define ws_ctube_container_of(ptr, type, member) ({ \
 	typeof(((type *)0)->member) *_container_of_ptr = ptr; \
 	((type *)((void *)(_container_of_ptr) - offsetof(type, member)));})
 
