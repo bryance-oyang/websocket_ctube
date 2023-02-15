@@ -22,7 +22,7 @@ imposed by the WebSocket standard)*
 The included demo solves the heat equation PDE in a C program and displays
 real-time simulation data in a browser HTML5 canvas.
 
-Demo requires python http.server module and ports 9736, 9743. Run
+Demo additionally requires `make`, python http.server module, and ports 9736, 9743. Run
 ```shell
 ./demo.sh
 ```
