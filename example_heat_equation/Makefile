@@ -2,7 +2,7 @@ FINAL=a.out
 srcdir=
 
 SHELL=/bin/sh
-CC=g++ -pipe -mtune=native -march=native -pthread
+CC=gcc -pipe -mtune=native -march=native -pthread
 OFLAGS=-Ofast -flto -ffat-lto-objects
 CFLAGS+=-std=gnu17 -Wall
 LDFLAGS=-lc -lm
