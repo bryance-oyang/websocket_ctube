@@ -259,12 +259,14 @@ static inline void ws_ctube_list_unlink(struct ws_ctube_list *l, struct ws_ctube
 	pthread_mutex_unlock(&node->mutex);
 }
 
-static inline void ws_ctube_list_push_front(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
+static inline int ws_ctube_list_push_front(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
+	int retval = 0;
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
 
 	if (node->next != NULL || node->prev != NULL) {
+		retval = -1;
 		goto out;
 	}
 	_ws_ctube_list_add_after(&l->head, node);
@@ -273,14 +275,17 @@ static inline void ws_ctube_list_push_front(struct ws_ctube_list *l, struct ws_c
 out:
 	pthread_mutex_unlock(&l->mutex);
 	pthread_mutex_unlock(&node->mutex);
+	return retval;
 }
 
-static inline void ws_ctube_list_push_back(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
+static inline int ws_ctube_list_push_back(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
+	int retval = 0;
 	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
 
 	if (node->next != NULL || node->prev != NULL) {
+		retval = -1;
 		goto out;
 	}
 	_ws_ctube_list_add_after(l->head.prev, node);
@@ -289,6 +294,7 @@ static inline void ws_ctube_list_push_back(struct ws_ctube_list *l, struct ws_ct
 out:
 	pthread_mutex_unlock(&l->mutex);
 	pthread_mutex_unlock(&node->mutex);
+	return retval;
 }
 
 

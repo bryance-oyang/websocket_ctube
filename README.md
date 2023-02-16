@@ -54,7 +54,7 @@ ctube.broadcast(data, data_size);
 Server is stopped when the destructor is called.
 
 ### C API
-**Note:** in C++, the C API is namespaced into `ws_ctube::`.
+**Note:** in C++, the C API is namespaced into `ws_ctube::`. When using C++, prefer to use the C++ wrapper class that provides RAII.
 
 ```C
 struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms,
