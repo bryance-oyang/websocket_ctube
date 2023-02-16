@@ -425,23 +425,23 @@ static inline int ws_ctube_bind_server(int server_sock, int port)
 }
 
 #endif /* WS_CTUBE_SOCKET_H */
-#ifndef WS_BASE_H
-#define WS_BASE_H
+#ifndef WS_CTUBE_WS_BASE_H
+#define WS_CTUBE_WS_BASE_H
 
 
-#define WS_FRAME_HDR_SIZE 2
-#define WS_MAX_PAYLD_SIZE 125
+#define WS_CTUBE_FRAME_HDR_SIZE 2
+#define WS_CTUBE_MAX_PAYLD_SIZE 125
 
 
-int ws_mkframe(char *frame, const char *msg, size_t msg_size, int first);
+int ws_ctube_ws_mkframe(char *frame, const char *msg, size_t msg_size, int first);
 
-int ws_send(int conn, const char *msg, size_t msg_size);
-int ws_recv(int conn, char *msg, int *msg_size, size_t max_msg_size);
-int ws_is_ping(const char *msg, int msg_size);
-int ws_pong(int conn, const char *msg, int msg_size);
-int ws_handshake(int conn, const struct timeval *timeout);
+int ws_ctube_ws_send(int conn, const char *msg, size_t msg_size);
+int ws_ctube_ws_recv(int conn, char *msg, int *msg_size, size_t max_msg_size);
+int ws_ctube_ws_is_ping(const char *msg, int msg_size);
+int ws_ctube_ws_pong(int conn, const char *msg, int msg_size);
+int ws_ctube_ws_handshake(int conn, const struct timeval *timeout);
 
-#endif /* WS_BASE_H */
+#endif /* WS_CTUBE_WS_BASE_H */
 #ifndef WS_CTUBE_STRUCT_H
 #define WS_CTUBE_STRUCT_H
 
@@ -1000,34 +1000,34 @@ static void ws_print_frame(const char *prefix, char *frame, int len)
 	fflush(stdout);
 }
 
-int ws_mkframe(char *frame, const char *msg, size_t msg_size, int first)
+int ws_ctube_ws_mkframe(char *frame, const char *msg, size_t msg_size, int first)
 {
 	int payld_size;
 
 	first = !!first;
-	if (msg_size > WS_MAX_PAYLD_SIZE) {
+	if (msg_size > WS_CTUBE_MAX_PAYLD_SIZE) {
 		frame[0] = 2*first;
-		payld_size = WS_MAX_PAYLD_SIZE;
+		payld_size = WS_CTUBE_MAX_PAYLD_SIZE;
 	} else {
 		frame[0] = 0b10000000 + 2*first;
 		payld_size = msg_size;
 	}
 
 	frame[1] = payld_size;
-	memcpy(&frame[WS_FRAME_HDR_SIZE], msg, payld_size);
+	memcpy(&frame[WS_CTUBE_FRAME_HDR_SIZE], msg, payld_size);
 
 	return payld_size;
 }
 
-int ws_send(int conn, const char *msg, size_t msg_size)
+int ws_ctube_ws_send(int conn, const char *msg, size_t msg_size)
 {
 	int payld_size;
 	char frame[WS_BUFLEN];
 
 	for (int first = 1; msg_size > 0; first = 0, msg += payld_size, msg_size -= payld_size) {
-		payld_size = ws_mkframe(frame, msg, msg_size, first);
-		const int frame_len = payld_size + WS_FRAME_HDR_SIZE;
-		ws_print_frame("ws_send()", frame, frame_len);
+		payld_size = ws_ctube_ws_mkframe(frame, msg, msg_size, first);
+		const int frame_len = payld_size + WS_CTUBE_FRAME_HDR_SIZE;
+		ws_print_frame("ws_ctube_ws_send()", frame, frame_len);
 		if (ws_ctube_socket_send_all(conn, frame, frame_len) != 0) {
 			return -1;
 		}
@@ -1036,8 +1036,9 @@ int ws_send(int conn, const char *msg, size_t msg_size)
 	return 0;
 }
 
-int ws_recv(int conn, char *msg, int *msg_size, size_t max_msg_size)
+int ws_ctube_ws_recv(int conn, char *msg, int *msg_size, size_t max_msg_size)
 {
+	/* TODO */
 	(void)conn;
 	(void)msg;
 	(void)msg_size;
@@ -1045,15 +1046,17 @@ int ws_recv(int conn, char *msg, int *msg_size, size_t max_msg_size)
 	return -1;
 }
 
-int ws_is_ping(const char *msg, int msg_size)
+int ws_ctube_ws_is_ping(const char *msg, int msg_size)
 {
+	/* TODO */
 	(void)msg;
 	(void)msg_size;
 	return 0;
 }
 
-int ws_pong(int conn, const char *msg, int msg_size)
+int ws_ctube_ws_pong(int conn, const char *msg, int msg_size)
 {
+	/* TODO */
 	(void)conn;
 	(void)msg;
 	(void)msg_size;
@@ -1093,7 +1096,7 @@ static int ws_server_response_key(char *server_key, const char *client_key)
 	return 0;
 }
 
-int ws_handshake(int conn, const struct timeval *timeout)
+int ws_ctube_ws_handshake(int conn, const struct timeval *timeout)
 {
 	char rbuf[WS_BUFLEN];
 	char *client_key;
@@ -1139,7 +1142,7 @@ int ws_handshake(int conn, const struct timeval *timeout)
 
 err:
 	if (WS_DEBUG) {
-		perror("ws_handshake()");
+		perror("ws_ctube_ws_handshake()");
 	}
 	return -1;
 }
@@ -1237,7 +1240,7 @@ static void *ws_ctube_writer_main(void *arg)
 		pthread_mutex_unlock(&ctube->out_data_mutex);
 
 		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_ctube_data, out_data);
-		send_retval = ws_send(conn->fd, (char *)out_data->data, out_data->data_size);
+		send_retval = ws_ctube_ws_send(conn->fd, (char *)out_data->data, out_data->data_size);
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_ctube_data */
 		ws_ctube_ref_count_release(out_data, refc, ws_ctube_data_free);
 
@@ -1346,7 +1349,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 				pthread_mutex_unlock(&conn_list->mutex);
 			}
 
-			if (ws_handshake(conn->fd, &conn->ctube->timeout_val) == 0) {
+			if (ws_ctube_ws_handshake(conn->fd, &conn->ctube->timeout_val) == 0) {
 				ws_ctube_conn_struct_start(conn);
 				_ws_ctube_conn_list_add(conn_list, conn);
 			}

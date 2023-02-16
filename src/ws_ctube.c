@@ -64,6 +64,7 @@ static void *ws_ctube_reader_main(void *arg)
 	char buf[WS_CTUBE_BUFLEN];
 
 	for (;;) {
+		/* TODO: handle ping/pong */
 		if (recv(conn->fd, buf, WS_CTUBE_BUFLEN, MSG_NOSIGNAL) < 1) {
 			_ws_ctube_connq_push(ctube, conn, WS_CTUBE_CONN_STOP);
 			if (WS_CTUBE_DEBUG) {
@@ -106,7 +107,7 @@ static void *ws_ctube_writer_main(void *arg)
 		pthread_mutex_unlock(&ctube->out_data_mutex);
 
 		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_ctube_data, out_data);
-		send_retval = ws_send(conn->fd, (char *)out_data->data, out_data->data_size);
+		send_retval = ws_ctube_ws_send(conn->fd, (char *)out_data->data, out_data->data_size);
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_ctube_data */
 		ws_ctube_ref_count_release(out_data, refc, ws_ctube_data_free);
 
@@ -215,7 +216,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 				pthread_mutex_unlock(&conn_list->mutex);
 			}
 
-			if (ws_handshake(conn->fd, &conn->ctube->timeout_val) == 0) {
+			if (ws_ctube_ws_handshake(conn->fd, &conn->ctube->timeout_val) == 0) {
 				ws_ctube_conn_struct_start(conn);
 				_ws_ctube_conn_list_add(conn_list, conn);
 			}
