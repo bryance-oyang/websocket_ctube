@@ -5,13 +5,18 @@
     <title>ws_ctube demo</title>
     <style>
       body {
+        display: flex;
         margin: 0;
+        border: 0;
         padding: 0;
         background-color: #eeeeee;
         font-family: monospace, Courier;
       }
       div {
         display: flex;
+        margin: 0;
+        border: 0;
+        padding: 0;
       }
       #main {
         flex-direction: column;
@@ -23,7 +28,7 @@
         justify-content: center;
         flex-wrap: nowrap;
         margin: 0;
-        padding: 7px 0px 7px 0px;
+        padding: 0.6rem 0 0.6rem 0;
         width: 100%;
         color: #eeeeee;
         font-weight: bold;
@@ -34,7 +39,7 @@
         justify-content: center;
         align-items: center;
         width: 100%;
-        height: 400px;
+        height: 25rem;
         color: #eeeeee;
         background-color: #363636;
       }
@@ -43,7 +48,7 @@
         justify-content: center;
         align-items: center;
         width: 60%;
-        max-width: 900px;
+        max-width: 54rem;
       }
       #title {
         flex-direction: column;
@@ -53,15 +58,24 @@
       }
       h1 {
         font-size: 2.3rem;
-        margin: 0;
-        border: 0;
         padding: 0;
+        border: 0;
+        margin: 0;
+      }
+      #the_canvas {
+        width: 20rem;
+        height: 20rem;
+        flex: 0 0 auto;
+        align-self: flex-end;
+        padding:0;
+        border: 0;
+        margin: 1.4rem;
       }
       #description {
         flex: 0 1 auto;
         flex-direction: column;
         width: 60%;
-        max-width: 900px;
+        max-width: 54rem;
         font-size: 1.2rem;
       }
     </style>
@@ -74,16 +88,15 @@
         <div id="sub_display">
           <div id="title">
             <h1>WebSocket Ctube Demo</h1>
-            <div style="height: 20px"></div>
+            <div style="height: 1.4rem"></div>
             <h1>Heat Equation Visualizer</h1>
           </div>
-          <div style="width:20px;"></div>
-          <canvas id="the_canvas" style="flex: 0 0 auto;" width=300px height=300px></canvas>
+          <canvas id="the_canvas"></canvas>
         </div>
       </div>
 
       <div id="description">
-        <p>Example use case: heat equation PDE is solved in real time with a C program.</p>
+        <p>Example use case: heat equation PDE is actively being solved by a C program.</p>
         <p>Data is transmitted from the C program to all connected websocket clients in a non-blocking manner (via separate threads) so the main C code can continue to run during network operations.</p>
         <p>Realtime simulation data from C program visualized above: blowtorch adds heat to metal plate which is also actively cooled. The sRGB colors here are computed from a physical blackbody spectrum.</p>
       </div>

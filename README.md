@@ -77,7 +77,8 @@ ws_ctube_close(ctube);
  * @param timeout_ms timeout (ms) for server starting and websocket handshake
  * or 0 for no timeout
  * @param max_broadcast_fps maximum number of broadcasts per second to rate
- * limit broadcasting or 0 for no limit
+ * limit broadcasting or 0 for no limit. For best performance, disable by
+ * setting to 0 and manually rate limit broadcasts.
  *
  * @return on success, a struct ws_ctube* is returned; on failure,
  * NULL is returned
@@ -100,8 +101,9 @@ void ws_ctube_close(struct ws_ctube *ctube);
  * network operations will be handled internally and opaquely by separate
  * threads.
  *
- * Though non-blocking, system calls performed by this function can possibly
- * take tens of microseconds. Try not to unnecessarily call this function.
+ * Though non-blocking, system calls performed by this function can potentially
+ * take tens of microseconds. Try not to unnecessarily call this function in
+ * tight loops.
  *
  * If other threads can write to *data, get a read-lock to protect *data before
  * broadcasting. The read-lock can be released immediately once this function
