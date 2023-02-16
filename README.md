@@ -70,10 +70,12 @@ On the browser side, we can read the broadcasted data with js:
 ```js
 const websocket = new WebSocket("ws://localhost:9743");
 websocket.binaryType = "arraybuffer";
-websocket.onmessage = async (event) => {
+websocket.onmessage = (event) => {
 	// get data transmitted by the C/C++ program
 	const data = new DataView(event.data)
 	// use data...
+	let x = data.getInt32(i, endianness);
+	// etc...
 }
 ```
 
