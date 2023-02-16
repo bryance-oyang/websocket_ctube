@@ -103,7 +103,7 @@
       <div id="description">
         <p>Example use case: heat equation PDE can be actively solved by a C program (compiled and run locally with <b>./demo.sh</b>).</p>
         <p>Data is transmitted from the C program to all connected websocket clients in a non-blocking manner (via separate threads) so the main C code can continue to run during network operations.</p>
-        <p>Realtime simulation data from the C program is visualized above in a HTML5 canvas drawn with javascript: blowtorch adds heat to a metal plate which is also being cooled. The sRGB colors are computed from a physical blackbody spectrum.</p>
+        <p>Realtime simulation data from the C program is visualized above in a HTML5 canvas drawn with javascript: heat source adds heat to a metal plate which is also being cooled. The sRGB colors are computed from a physical blackbody spectrum.</p>
         <p>To use in your C/C++ programs: #include "ws_ctube.h" and call ws_ctube_broadcast(). See README.md for details.</p>
       </div>
     </div>
@@ -156,24 +156,24 @@
       }
 
       function connection_status_update() {
-          if (conn_status == 0) {
-            // loading
-            status_bar.innerHTML = "- Establishing connection... (is ./demo.sh running?) -";
+        if (conn_status == 0) {
+          // loading
+          status_bar.innerHTML = "- Establishing connection... (is ./demo.sh running?) -";
 
-            // pulsing color
-            const date = new Date();
-            const time = date.getTime() / 1000;
-            const pulse = 0.5 + 0.10*Math.cos(2*Math.PI*time);
-            const red = pulse * 255;
-            const green = pulse * 123;
-            const blue = pulse * 37;
-            status_bar.style.backgroundColor = "rgb(" + red + "," + green + "," + blue + ")";
-          } else {
-            // connected
-            status_bar.innerHTML = "- Connected to C program -";
-            status_bar.style.backgroundColor = "rgb(62, 85, 171)";
-          }
-          setTimeout(connection_status_update, 50);
+          // pulsing color
+          const date = new Date();
+          const time = date.getTime() / 1000;
+          const pulse = 0.5 + 0.10*Math.cos(2*Math.PI*time);
+          const red = pulse * 255;
+          const green = pulse * 123;
+          const blue = pulse * 37;
+          status_bar.style.backgroundColor = "rgb(" + red + "," + green + "," + blue + ")";
+        } else {
+          // connected
+          status_bar.innerHTML = "- Connected to C program -";
+          status_bar.style.backgroundColor = "rgb(62, 85, 171)";
+        }
+        setTimeout(connection_status_update, 50);
       }
 
       connect();

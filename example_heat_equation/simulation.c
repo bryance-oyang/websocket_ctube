@@ -2,7 +2,7 @@
  * @file
  * @brief random simulation to make pretty data for demo
  *
- * Barebones heat equation solver: blowtorch adds heat to metal plate which is
+ * Barebones heat equation solver: heat source adds heat to metal plate which is
  * also actively cooled
  */
 
