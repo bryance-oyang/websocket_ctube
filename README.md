@@ -26,9 +26,9 @@ Demo additionally requires `make`, python http.server module, and ports 9736, 97
 ./demo.sh
 ```
 then once the server has started, open a modern :) browser to
-`http://localhost:9736/heat_equation.html`
+`http://localhost:9736/example_heat_equation.html`
 
-See `main.c`, `heat_equation.html` in `example_heat_equation/` for example
+See `main.c`, `example_heat_equation.html` in `example_heat_equation/` for example
 source code.
 
 ## Usage
