@@ -65,8 +65,8 @@ ws_ctube_broadcast(ctube, data, data_size);
 ws_ctube_close(ctube);
 ```
 
-### Javascript
-On the browser side, we can read the broadcasted data with standard javascript:
+### JavaScript
+On the browser side, we can read the broadcasted data with standard JavaScript:
 ```js
 const websocket = new WebSocket("ws://localhost:9743");
 websocket.binaryType = "arraybuffer";
