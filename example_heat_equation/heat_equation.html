@@ -2,55 +2,118 @@
 
 <html>
   <head>
-    <title>WebSocket Ctube Demo</title>
+    <title>ws_ctube demo</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #eeeeee;
+        font-family: monospace, Courier;
+      }
+      div {
+        display: flex;
+      }
+      #main {
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+      }
+      #status_bar {
+        align-items: center;
+        justify-content: center;
+        flex-wrap: nowrap;
+        margin: 0;
+        padding: 7px 0px 7px 0px;
+        width: 100%;
+        color: #eeeeee;
+        font-weight: bold;
+        font-size: 1rem;
+      }
+      #display {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        height: 400px;
+        color: #eeeeee;
+        background-color: #363636;
+      }
+      #sub_display {
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        width: 60%;
+        max-width: 900px;
+      }
+      #title {
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-start;
+        width: 100%;
+      }
+      h1 {
+        font-size: 2.3rem;
+        margin: 0;
+        border: 0;
+        padding: 0;
+      }
+      #description {
+        flex: 0 1 auto;
+        flex-direction: column;
+        width: 60%;
+        max-width: 900px;
+        font-size: 1.2rem;
+      }
+    </style>
   </head>
   <body>
-    <h1>WebSocket Ctube Demo: Heat Equation Visualizer</h1>
-    <div id="loading_div">
+    <div id="main">
+      <div id="status_bar"></div>
 
-    </div>
+      <div id="display">
+        <div id="sub_display">
+          <div id="title">
+            <h1>WebSocket Ctube Demo</h1>
+            <div style="height: 20px"></div>
+            <h1>Heat Equation Visualizer</h1>
+          </div>
+          <div style="width:20px;"></div>
+          <canvas id="the_canvas" style="flex: 0 0 auto;" width=300px height=300px></canvas>
+        </div>
+      </div>
 
-    <div id="main_div">
-      <p>Example use case: heat equation PDE is solved in real time with a C program.</p>
-      <p>Data is transmitted from the C program to all connected websocket clients in a non-blocking manner (via separate threads) so the main C code can continue to run during network operations.</p>
-      <p>Realtime simulation data from C program visualized below: blowtorch adds heat to metal plate which is also actively cooled.</p>
-
-      <canvas id="the_it" width=300 height=300></canvas>
-
-      <p>Neat sidenote: the sRGB colors here are computed from a physical blackbody spectrum.</p>
+      <div id="description">
+        <p>Example use case: heat equation PDE is solved in real time with a C program.</p>
+        <p>Data is transmitted from the C program to all connected websocket clients in a non-blocking manner (via separate threads) so the main C code can continue to run during network operations.</p>
+        <p>Realtime simulation data from C program visualized above: blowtorch adds heat to metal plate which is also actively cooled. The sRGB colors here are computed from a physical blackbody spectrum.</p>
+      </div>
     </div>
 
     <script lang="javascript">
-      const loading_div = document.getElementById("loading_div");
-      const canvas = document.getElementById("the_it");
-      const ctx = canvas.getContext("2d", {willReadFrequently: true});
+      // C program data will be drawn to this canvas
+      const canvas = document.getElementById("the_canvas");
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      function loading() {
-          loading_div.innerHTML = "<h3>Loading: connecting to WebSocket Ctube server... (did you run ./demo.sh?)</h3>";
-          loading_div.style.display = "flex";
-          loading_div.style.color = "#aa0000";
-          loading_div.style.fontWeight = "bold";
+      // websocket connection status display
+      let conn_status = 0;
+      const status_bar = document.getElementById("status_bar");
 
-          main_div.style.color = "#808080";
-      }
-
-      // open websocket connection with C program matching the port
       function connect() {
-        websocket = new WebSocket("ws://localhost:9743");
+        // open websocket connection with C program matching the port
+        const websocket = new WebSocket("ws://localhost:9743");
         websocket.binaryType = "arraybuffer";
 
+        // try to reconnect if connection fails
         websocket.onclose = (event) => {
-          loading();
+          conn_status = 0;
           console.log("trying reconnect to websocket server");
-          setTimeout(connect, 1000);
+          setTimeout(connect, 100);
         }
 
         websocket.onopen = (event) => {
-          loading_div.innerHTML = "<h3>Connected</h3>";
-          loading_div.style.display = "flex";
-          loading_div.style.color = "#00aa00";
-
-          main_div.style.color = "black";;
+          conn_status = 1;
         }
 
         websocket.onmessage = async (event) => {
@@ -71,8 +134,30 @@
           ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         }
       }
-      loading();
+
+      function connection_status_update() {
+          if (conn_status == 0) {
+            // loading
+            status_bar.innerHTML = "Establishing connection... (is ./demo.sh running?)";
+
+            // pulsing color
+            const date = new Date();
+            const time = date.getTime() / 1000;
+            const pulse = 0.72 + 0.28*Math.cos(2*Math.PI*time);
+            const red = pulse * 50;
+            const green = pulse * 0;
+            const blue = pulse * 0;
+            status_bar.style.backgroundColor = "rgb(" + red + "%," + green + "%," + blue + "%)";
+          } else {
+            // connected
+            status_bar.innerHTML = "Connected";
+            status_bar.style.backgroundColor = "#008800";
+          }
+          setTimeout(connection_status_update, 50);
+      }
+
       connect();
+      connection_status_update();
     </script>
   </body>
 </html>
