@@ -79,7 +79,6 @@ websocket.onmessage = (event) => {
 }
 ```
 
-
 ### C API Details
 ```C
 /**

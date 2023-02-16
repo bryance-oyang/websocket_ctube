@@ -20,14 +20,14 @@
 
 static float t; // time
 static float *grid, *prev_grid; // simulation grid
-static pthread_mutex_t img_mutex; // protects img_data
+static pthread_mutex_t example_mutex; // example mutex to protect img_data (not actually needed in this case)
 static uint8_t *img_data; // simulation grid mapped to image rgb [0,255]
 
 const int low_temperature = 600; // for color mapping
 const int high_temperature = 3000; // for color mapping
 struct blackbody_RGB_8_table blackbody_color_table; // physically computed blackbody sRGB
 
-int simulation_init(pthread_mutex_t **data_mutex)
+int simulation_init(pthread_mutex_t **mutex)
 {
 	grid = (typeof(grid))malloc(GRID_SIDE*GRID_SIDE*sizeof(*grid));
 	if (grid == NULL)
@@ -44,8 +44,8 @@ int simulation_init(pthread_mutex_t **data_mutex)
 	if (blackbody_RGB_8_table_init(&blackbody_color_table, low_temperature, high_temperature) != 0)
 		goto err_nocolor;
 
-	pthread_mutex_init(&img_mutex, NULL);
-	*data_mutex = &img_mutex;
+	pthread_mutex_init(&example_mutex, NULL);
+	*mutex = &example_mutex;
 
 	/* simulation var init */
 	t = 0;
@@ -73,7 +73,7 @@ void simulation_destroy()
 	free(prev_grid);
 	free(img_data);
 	blackbody_RGB_8_table_destroy(&blackbody_color_table);
-	pthread_mutex_destroy(&img_mutex);
+	pthread_mutex_destroy(&example_mutex);
 }
 
 static float heat_src(float t, int i, int j)
@@ -142,7 +142,7 @@ static void mkimg()
 	const float min = 0;
 	const float max = GRID_SIDE / 4;
 
-	pthread_mutex_lock(&img_mutex);
+	pthread_mutex_lock(&example_mutex);
 	for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++) {
 		/* linearly map simulation grid data to a temperature */
 		int temperature = (grid[i] - min) * (high_temperature - low_temperature) / (max - min) + low_temperature;
@@ -154,5 +154,5 @@ static void mkimg()
 		img_data[3*i + 1] = srgb->RGB[1];
 		img_data[3*i + 2] = srgb->RGB[2];
 	}
-	pthread_mutex_unlock(&img_mutex);
+	pthread_mutex_unlock(&example_mutex);
 }
