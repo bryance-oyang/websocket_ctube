@@ -78,11 +78,16 @@
         max-width: 54rem;
         font-size: 1.2rem;
       }
+      p {
+        padding: 0;
+        border: 0;
+        margin: 1rem;
+      }
     </style>
   </head>
   <body>
     <div id="main">
-      <div id="status_bar"></div>
+      <div id="status_bar" style="background-color: rgb(127, 61, 18);">- Establishing connection... (is ./demo.sh running?) -</div>
 
       <div id="display">
         <div id="sub_display">
@@ -96,9 +101,10 @@
       </div>
 
       <div id="description">
-        <p>Example use case: heat equation PDE is actively being solved by a C program (compiled and run by ./demo.sh).</p>
+        <p>Example use case: heat equation PDE can be actively solved by a C program (compiled and run locally with <b>./demo.sh</b>).</p>
         <p>Data is transmitted from the C program to all connected websocket clients in a non-blocking manner (via separate threads) so the main C code can continue to run during network operations.</p>
-        <p>Realtime simulation data from C program visualized above: blowtorch adds heat to metal plate which is also actively cooled. The sRGB colors are computed from a physical blackbody spectrum.</p>
+        <p>Realtime simulation data from the C program is visualized above in a HTML5 canvas drawn with javascript: blowtorch adds heat to a metal plate which is also being cooled. The sRGB colors are computed from a physical blackbody spectrum.</p>
+        <p>To use in your C/C++ programs: #include "ws_ctube.h" and call ws_ctube_broadcast(). See README.md for details.</p>
       </div>
     </div>
 
