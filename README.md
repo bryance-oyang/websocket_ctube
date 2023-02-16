@@ -1,7 +1,7 @@
 # WebSocket Ctube
 `websocket_ctube` is a barebones, header-only library to enable a high
 performance C/C++ program to share its data with webpages in real-time while
-actively running (it is a simple non-blocking WebSocket broadcast server).
+actively running (it implements a simple non-blocking WebSocket broadcast server).
 
 Call `ws_ctube_broadcast()` to send arbitrary data to all connected browsers via
 the WebSocket standard.  The main C/C++ program thread can continue to run while
@@ -9,7 +9,7 @@ the network operations are handled by `websocket_ctube` in separate threads.
 
 Simply include `ws_ctube.h` in your project and compile with `-pthread`.
 
-*TLS/SSL is not yet unsupported so the browser webpage trying to connect to
+*TLS/SSL is not yet supported so the browser webpage trying to connect to
 `websocket_ctube` cannot be served with https for now (this is a security requirement
 imposed by the WebSocket standard)*
 
@@ -43,8 +43,7 @@ The C++ API provides a RAII wrapper class around the C API described below.
 Create and start the `websocket_ctube` server:
 
 ```C++
-ws_ctube::WS_Ctube ctube{port, max_nclient, timeout_ms,
-max_broadcast_fps};
+ws_ctube::WS_Ctube ctube{port, max_nclient, timeout_ms, max_broadcast_fps};
 ```
 
 Non-blocking broadcast to connected browsers:
@@ -66,7 +65,20 @@ ws_ctube_broadcast(ctube, data, data_size);
 ws_ctube_close(ctube);
 ```
 
-#### Details
+### Javascript
+On the browser side, we can read the broadcasted data with js:
+```js
+const websocket = new WebSocket("ws://localhost:9743");
+websocket.binaryType = "arraybuffer";
+websocket.onmessage = async (event) => {
+	// get data transmitted by the C/C++ program
+	const data = new DataView(event.data)
+	// use data...
+}
+```
+
+
+### C API Details
 ```C
 /**
  * ws_ctube_open - create a ws_ctube websocket server that must be closed with

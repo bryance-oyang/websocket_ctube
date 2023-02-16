@@ -106,7 +106,8 @@
       // C program data will be drawn to this canvas
       const canvas = document.getElementById("the_canvas");
       const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#000000";
+      // initially fill canvas with black
+      ctx.fillStyle = "black";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       // websocket connection status display
@@ -117,17 +118,6 @@
         // open websocket connection with C program matching the port
         const websocket = new WebSocket("ws://localhost:9743");
         websocket.binaryType = "arraybuffer";
-
-        // try to reconnect if connection fails
-        websocket.onclose = (event) => {
-          conn_status = 0;
-          console.log("trying reconnect to websocket server");
-          setTimeout(connect, 100);
-        }
-
-        websocket.onopen = (event) => {
-          conn_status = 1;
-        }
 
         websocket.onmessage = async (event) => {
           // get image data transmitted by the C program
@@ -146,12 +136,23 @@
           const bitmap = await createImageBitmap(img);
           ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         }
+
+        // try to reconnect if connection fails
+        websocket.onclose = (event) => {
+          conn_status = 0;
+          console.log("trying reconnect to websocket server");
+          setTimeout(connect, 100);
+        }
+
+        websocket.onopen = (event) => {
+          conn_status = 1;
+        }
       }
 
       function connection_status_update() {
           if (conn_status == 0) {
             // loading
-            status_bar.innerHTML = "Establishing connection... (is ./demo.sh running?)";
+            status_bar.innerHTML = "- Establishing connection... (is ./demo.sh running?) -";
 
             // pulsing color
             const date = new Date();
@@ -163,7 +164,7 @@
             status_bar.style.backgroundColor = "rgb(" + red + "," + green + "," + blue + ")";
           } else {
             // connected
-            status_bar.innerHTML = "Connected";
+            status_bar.innerHTML = "- Connected to C program -";
             status_bar.style.backgroundColor = "rgb(62, 85, 171)";
           }
           setTimeout(connection_status_update, 50);
