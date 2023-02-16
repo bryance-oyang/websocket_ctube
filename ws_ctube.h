@@ -1198,6 +1198,7 @@ static void *ws_ctube_reader_main(void *arg)
 	char buf[WS_CTUBE_BUFLEN];
 
 	for (;;) {
+		/* TODO: handle ping/pong */
 		if (recv(conn->fd, buf, WS_CTUBE_BUFLEN, MSG_NOSIGNAL) < 1) {
 			_ws_ctube_connq_push(ctube, conn, WS_CTUBE_CONN_STOP);
 			if (WS_CTUBE_DEBUG) {
