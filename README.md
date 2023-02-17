@@ -144,3 +144,7 @@ When a writer wakes, it acquires a reference to the current `ws_ctube_data` and
 sends the data to its client via data frames according to the WebSocket
 standard. Having one writer per client means that clients cannot block each
 other.
+
+`ws_ctube_close()` cancels the threads and frees associated resources.
+Cancelling the connection handler thread causes cancellation of all
+reader/writer threads.
