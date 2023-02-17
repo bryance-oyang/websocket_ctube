@@ -43,9 +43,8 @@ ws_ctube_broadcast(ctube, data, data_size); /* broadcast once */
 /* do more stuff */
 ws_ctube_close(ctube);
 ```
-Compile with `-pthread`. **Important note:** in C++, the C API is namespaced
-into `ws_ctube::`. You can easily write your own RAII wrapper class for C++ if
-desired.
+Compile with `-pthread`. You can easily write your own RAII wrapper class for
+C++ if desired.
 
 On the browser side, we can read the broadcasted data with standard JavaScript:
 ```js

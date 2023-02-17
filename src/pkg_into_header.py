@@ -85,9 +85,7 @@ def main():
         hfile.write(system_include_str())
         hfile.write("\n\n#ifdef __cplusplus\n} /* extern \"C\" */\n#endif /* __cplusplus */\n")
 
-        hfile.write("#ifdef __cplusplus\nnamespace ws_ctube {\n#endif /* __cplusplus */\n\n")
         hfile.write(code)
-        hfile.write("\n\n#ifdef __cplusplus\n} /* namespace ws_ctube */\n#endif /* __cplusplus */\n")
 
         hfile.write("\n\n#endif /* WS_CTUBE_H */")
 

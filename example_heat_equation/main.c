@@ -12,10 +12,6 @@
 #include "ws_ctube.h"
 #include "simulation.h"
 
-#ifdef __cplusplus
-using namespace ws_ctube;
-#endif
-
 int main()
 {
 	printf("starting websocket ctube...\n");

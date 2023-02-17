@@ -9,10 +9,6 @@ extern "C" {
 } /* extern "C" */
 #endif /* __cplusplus */
 
-#ifdef __cplusplus
-namespace ws_ctube {
-#endif /* __cplusplus */
-
 struct ws_ctube;
 
 /**
@@ -63,9 +59,5 @@ void ws_ctube_close(struct ws_ctube *ctube);
  * @return 0 on success, nonzero otherwise
  */
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
-
-#ifdef __cplusplus
-} /* namespace ws_ctube */
-#endif /* __cplusplus */
 
 #endif /* WS_CTUBE_H_INCLUDE */
