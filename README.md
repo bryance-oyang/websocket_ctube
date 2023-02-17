@@ -27,17 +27,17 @@ Demo additionally requires `make`, `python`, and ports 9736, 9743. Run
 ./demo.sh
 ```
 to compile and run, then once the server has started, open a modern :) browser
-to `http://localhost:9736/example_heat_equation.html` or just the file `example_heat_equation.html`
+to `http://localhost:9736/example_heat_equation.html` or just the file
+`example_heat_equation.html`
 
-See `main.c`, `example_heat_equation.html` in `example_heat_equation/` for example
-source code.
+See `main.c`, `example_heat_equation.html` in `example_heat_equation/` for
+example source code.
 
 ## Usage
 ```C
 #include "ws_ctube.h"
 
-struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms,
-max_broadcast_fps);
+struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
 /* do stuff */
 ws_ctube_broadcast(ctube, data, data_size); /* broadcast once */
 /* do more stuff */
@@ -77,7 +77,8 @@ websocket.onmessage = (event) => {
  * @return on success, a struct ws_ctube* is returned; on failure,
  * NULL is returned
  */
-struct ws_ctube *ws_ctube_open(int port, int max_nclient, int timeout_ms, double max_broadcast_fps);
+struct ws_ctube *ws_ctube_open(int port, int max_nclient, int timeout_ms, double
+max_broadcast_fps);
 
 /**
  * ws_ctube_close - terminate ws_ctube server and cleanup
@@ -109,7 +110,8 @@ void ws_ctube_close(struct ws_ctube *ctube);
  *
  * @return 0 on success, nonzero otherwise
  */
-int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
+int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t
+data_size);
 ```
 
 ## Internal Architecture
