@@ -1,9 +1,8 @@
 # WebSocket Ctube
 `websocket_ctube` is a barebones, header-only library to enable a high
-performance C/C++ program to easily share its data with webpages in real-time
-while actively running (it implements a simple non-blocking WebSocket broadcast
-server). Modern web technology can then be harnessed to monitor or visualize
-data.
+performance C/C++ program to easily share its data with webpages while actively
+running (it implements a simple non-blocking WebSocket broadcast server). Modern
+web technology can then be harnessed to monitor or visualize data in real-time.
 
 Call `ws_ctube_broadcast()` to send arbitrary data to all connected browsers via
 the WebSocket standard.  The main C/C++ program thread can continue to run while
@@ -23,12 +22,12 @@ requirement imposed by the WebSocket standard)*
 The included demo solves the heat equation PDE in a C program and displays
 real-time simulation data in a browser HTML5 canvas.
 
-Demo additionally requires `make`, python http.server module, and ports 9736, 9743. Run
+Demo additionally requires `make`, `python`, and ports 9736, 9743. Run
 ```shell
 ./demo.sh
 ```
-then once the server has started, open a modern :) browser to
-`http://localhost:9736/example_heat_equation.html`
+to compile and run, then once the server has started, open a modern :) browser
+to `http://localhost:9736/example_heat_equation.html` or just the file `example_heat_equation.html`
 
 See `main.c`, `example_heat_equation.html` in `example_heat_equation/` for example
 source code.
@@ -36,37 +35,16 @@ source code.
 ## Usage
 ```C
 #include "ws_ctube.h"
-```
-and compile with `-pthread`
 
-### C++ API
-The C++ API provides a wrapper class around the C API described below.
-
-Create and start the `websocket_ctube` server:
-
-```C++
-ws_ctube::WS_Ctube ctube{port, max_nclient, timeout_ms, max_broadcast_fps};
-```
-
-Non-blocking broadcast to connected browsers:
-```C++
-ctube.broadcast(data, data_size);
-```
-
-Server is stopped when the destructor is called.
-
-### C API
-**Note:** in C++, the C API is namespaced into `ws_ctube::`.
-```C
 struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms,
 max_broadcast_fps);
 /* do stuff */
-ws_ctube_broadcast(ctube, data, data_size);
+ws_ctube_broadcast(ctube, data, data_size); /* broadcast once */
 /* do more stuff */
 ws_ctube_close(ctube);
 ```
+and compile with `-pthread`. **Note:** in C++, the C API is namespaced into `ws_ctube::`.
 
-### JavaScript
 On the browser side, we can read the broadcasted data with standard JavaScript:
 ```js
 const websocket = new WebSocket("ws://localhost:9743");

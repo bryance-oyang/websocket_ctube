@@ -75,34 +75,6 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 } /* namespace ws_ctube */
 #endif /* __cplusplus */
 
-#ifdef __cplusplus
-#include <stdexcept>
-
-namespace ws_ctube {
-
-class WS_Ctube {
-public:
-	struct ws_ctube *_ctube;
-
-	WS_Ctube(int port, int max_nclient, int timeout_ms, double max_broadcast_fps) {
-		_ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
-		if (_ctube == NULL) {
-			throw ::std::runtime_error("WS_Ctube failed to start");
-		}
-	}
-
-	~WS_Ctube() {
-		ws_ctube_close(_ctube);
-	}
-
-	int broadcast(const void *data, size_t data_size) {
-		return ws_ctube_broadcast(_ctube, data, data_size);
-	}
-};
-
-} /* namespace ws_ctube */
-#endif /* __cplusplus */
-
 #endif /* WS_CTUBE_H_INCLUDE */
 #ifdef __cplusplus
 namespace ws_ctube {
