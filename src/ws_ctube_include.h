@@ -73,7 +73,7 @@ namespace ws_ctube {
 
 class WS_Ctube {
 public:
-	struct ws_ctube *_ctube;
+	struct ws_ctube *_ctube = NULL;
 
 	WS_Ctube(int port, int max_nclient, int timeout_ms, double max_broadcast_fps) {
 		_ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
@@ -83,7 +83,10 @@ public:
 	}
 
 	~WS_Ctube() {
-		ws_ctube_close(_ctube);
+		if (_ctube != NULL) {
+			ws_ctube_close(_ctube);
+			_ctube = NULL;
+		}
 	}
 
 	int broadcast(const void *data, size_t data_size) {

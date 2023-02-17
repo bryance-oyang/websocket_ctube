@@ -1,7 +1,9 @@
 # WebSocket Ctube
 `websocket_ctube` is a barebones, header-only library to enable a high
-performance C/C++ program to share its data with webpages in real-time while
-actively running (it implements a simple non-blocking WebSocket broadcast server).
+performance C/C++ program to easily share its data with webpages in real-time
+while actively running (it implements a simple non-blocking WebSocket broadcast
+server). Modern web technology can then be harnessed to monitor or visualize
+data.
 
 Call `ws_ctube_broadcast()` to send arbitrary data to all connected browsers via
 the WebSocket standard.  The main C/C++ program thread can continue to run while
@@ -10,14 +12,14 @@ the network operations are handled by `websocket_ctube` in separate threads.
 Simply include `ws_ctube.h` in your project and compile with `-pthread`.
 
 *TLS/SSL is not yet supported so the browser webpage trying to connect to
-`websocket_ctube` cannot be served with https for now (this is a security requirement
-imposed by the WebSocket standard)*
+`websocket_ctube` cannot be served with https for now (this is a security
+requirement imposed by the WebSocket standard)*
 
 ## Requirements
 * gcc >= 4.7.0 or similar
 * POSIX stuff: `pthread` and friends (aka sorry Windows)
 
-## Example use case: heat equation visualizer
+## An example use case: heat equation visualizer
 The included demo solves the heat equation PDE in a C program and displays
 real-time simulation data in a browser HTML5 canvas.
 
@@ -38,7 +40,7 @@ source code.
 and compile with `-pthread`
 
 ### C++ API
-The C++ API provides a RAII wrapper class around the C API described below.
+The C++ API provides a wrapper class around the C API described below.
 
 Create and start the `websocket_ctube` server:
 
@@ -54,8 +56,7 @@ ctube.broadcast(data, data_size);
 Server is stopped when the destructor is called.
 
 ### C API
-**Note:** in C++, the C API is namespaced into `ws_ctube::`. When using C++, prefer to use the C++ wrapper class that provides RAII.
-
+**Note:** in C++, the C API is namespaced into `ws_ctube::`.
 ```C
 struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms,
 max_broadcast_fps);
