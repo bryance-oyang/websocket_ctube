@@ -77,7 +77,7 @@ def main():
  */
 
 """)
-        hfile.write("#ifndef WS_CTUBE_H\n#define WS_CTUBE_H\n\n")
+        hfile.write("#ifndef WS_CTUBE_H\n#define WS_CTUBE_H\n")
         hfile.write("#ifdef __cplusplus\nextern \"C\" {\n#endif /* __cplusplus */\n\n")
 
         hfile.write(ws_ctube_h)

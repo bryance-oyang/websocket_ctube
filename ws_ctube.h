@@ -6,13 +6,12 @@
 
 #ifndef WS_CTUBE_H
 #define WS_CTUBE_H
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-#ifndef WS_CTUBE_H_INCLUDE
-#define WS_CTUBE_H_INCLUDE
+#ifndef WS_CTUBE_INCLUDE_H
+#define WS_CTUBE_INCLUDE_H
 
 #include <stddef.h>
 
@@ -67,7 +66,7 @@ void ws_ctube_close(struct ws_ctube *ctube);
  */
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 
-#endif /* WS_CTUBE_H_INCLUDE */
+#endif /* WS_CTUBE_INCLUDE_H */
 #include <pthread.h>
 #include <signal.h>
 #include <stddef.h>
