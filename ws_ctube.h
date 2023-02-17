@@ -10,10 +10,12 @@
 #ifndef WS_CTUBE_H_INCLUDE
 #define WS_CTUBE_H_INCLUDE
 
-#ifndef __cplusplus
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 #include <stddef.h>
-#else /* __cplusplus*/
-#include <cstddef>
+#ifdef __cplusplus
+} /* extern "C" */
 #endif /* __cplusplus */
 
 #ifdef __cplusplus
@@ -77,7 +79,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 
 #endif /* WS_CTUBE_H_INCLUDE */
 #ifdef __cplusplus
-namespace ws_ctube {
+extern "C" {
 #endif /* __cplusplus */
 
 #include <pthread.h>
@@ -92,6 +94,15 @@ namespace ws_ctube {
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
+
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif /* __cplusplus */
+#ifdef __cplusplus
+namespace ws_ctube {
+#endif /* __cplusplus */
+
 #ifndef WS_CTUBE_CONTAINER_OF_H
 #define WS_CTUBE_CONTAINER_OF_H
 
@@ -1829,5 +1840,6 @@ out_nolock:
 #ifdef __cplusplus
 } /* namespace ws_ctube */
 #endif /* __cplusplus */
+
 
 #endif /* WS_CTUBE_H */

@@ -1,10 +1,12 @@
 #ifndef WS_CTUBE_H_INCLUDE
 #define WS_CTUBE_H_INCLUDE
 
-#ifndef __cplusplus
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 #include <stddef.h>
-#else /* __cplusplus*/
-#include <cstddef>
+#ifdef __cplusplus
+} /* extern "C" */
 #endif /* __cplusplus */
 
 #ifdef __cplusplus
