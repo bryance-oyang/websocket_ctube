@@ -27,6 +27,7 @@ static void ws_ctube_init_b64_encode_table()
 	ws_ctube_b64_encode_table[63] = '/';
 }
 
+/* 3*8 -> 4*6 base64 encoding */
 static void ws_ctube_b64_encode_triplet(unsigned char *out, unsigned char in0, unsigned char in1, unsigned char in2)
 {
 	uint32_t triplet = ((uint32_t)in0 << 16) + ((uint32_t)in1 << 8) + (uint32_t)in2;
@@ -36,9 +37,16 @@ static void ws_ctube_b64_encode_triplet(unsigned char *out, unsigned char in0, u
 	}
 }
 
-/* out must be large enough to hold output + 1 for null terminator */
+/**
+ * gives the base64 encoding of in. out must be large enough to hold output + 1
+ * for null terminator
+ */
 void ws_ctube_b64_encode(unsigned char *out, const unsigned char *in, size_t in_bytes)
 {
+#ifndef __cplusplus
+	_Static_assert(sizeof(uint8_t) == sizeof(unsigned char), "ws_ctube_b64_encode(): unsigned char not 8 bits");
+#endif /* __cplusplus */
+
 	ws_ctube_init_b64_encode_table();
 
 	while (in_bytes >= 3) {
@@ -129,6 +137,10 @@ static inline void ws_ctube_sha1_mkwords(uint32_t *const words, const uint8_t *c
 	ws_ctube_sha1_wordgen(words);
 }
 
+/**
+ * computes the sha1 hash of in and stores the result in out. out must be able
+ * to hold the 20 byte output of sha1
+ */
 void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 {
 #ifndef __cplusplus

@@ -751,6 +751,7 @@ static void ws_ctube_init_b64_encode_table()
 	ws_ctube_b64_encode_table[63] = '/';
 }
 
+/* 3*8 -> 4*6 base64 encoding */
 static void ws_ctube_b64_encode_triplet(unsigned char *out, unsigned char in0, unsigned char in1, unsigned char in2)
 {
 	uint32_t triplet = ((uint32_t)in0 << 16) + ((uint32_t)in1 << 8) + (uint32_t)in2;
@@ -760,9 +761,13 @@ static void ws_ctube_b64_encode_triplet(unsigned char *out, unsigned char in0, u
 	}
 }
 
-/* out must be large enough to hold output + 1 for null terminator */
+
 void ws_ctube_b64_encode(unsigned char *out, const unsigned char *in, size_t in_bytes)
 {
+#ifndef __cplusplus
+	_Static_assert(sizeof(uint8_t) == sizeof(unsigned char), "ws_ctube_b64_encode(): unsigned char not 8 bits");
+#endif /* __cplusplus */
+
 	ws_ctube_init_b64_encode_table();
 
 	while (in_bytes >= 3) {
@@ -852,6 +857,7 @@ static inline void ws_ctube_sha1_mkwords(uint32_t *const words, const uint8_t *c
 
 	ws_ctube_sha1_wordgen(words);
 }
+
 
 void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len_bytes)
 {
@@ -978,6 +984,7 @@ static void ws_print_frame(const char *prefix, char *frame, int len)
 	fflush(stdout);
 }
 
+
 int ws_ctube_ws_mkframe(char *frame, const char *msg, size_t msg_size, int first)
 {
 	int payld_size;
@@ -996,6 +1003,7 @@ int ws_ctube_ws_mkframe(char *frame, const char *msg, size_t msg_size, int first
 
 	return payld_size;
 }
+
 
 int ws_ctube_ws_send(int conn, const char *msg, size_t msg_size)
 {
@@ -1041,13 +1049,22 @@ int ws_ctube_ws_pong(int conn, const char *msg, int msg_size)
 	return 0;
 }
 
+
 static char *ws_client_key(char *rbuf)
 {
 	char *client_key, *client_key_end;
 
 	client_key = strstr(rbuf, "Sec-WebSocket-Key: ");
+	if (client_key == NULL) {
+		return NULL;
+	}
+
 	client_key += strlen("Sec-WebSocket-Key: ");
 	client_key_end = strstr(client_key, "\r");
+	if (client_key_end == NULL) {
+		return NULL;
+	}
+
 	*client_key_end = '\0';
 	if (WS_DEBUG) {
 		printf("wskey\n%s\n", client_key);
@@ -1055,18 +1072,16 @@ static char *ws_client_key(char *rbuf)
 	return client_key;
 }
 
+
 static int ws_server_response_key(char *server_key, const char *client_key)
 {
 	size_t sha1_hash_len = 20;
 	char magic_client_key[WS_BUFLEN];
 	char client_sha1[WS_BUFLEN];
 
-	strncpy(magic_client_key, client_key, WS_BUFLEN - 1);
-	magic_client_key[WS_BUFLEN - 1] = '\0';
-
-	strncat(magic_client_key, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
-		WS_BUFLEN - strlen(magic_client_key) - 1);
-	magic_client_key[WS_BUFLEN - 1] = '\0';
+	if (snprintf(magic_client_key, WS_BUFLEN, "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", client_key) >= WS_BUFLEN) {
+		return -1;
+	}
 
 	ws_ctube_sha1sum((unsigned char *)client_sha1, (unsigned char *)magic_client_key, strlen(magic_client_key));
 	ws_ctube_b64_encode((unsigned char *)server_key, (unsigned char *)client_sha1, sha1_hash_len);
@@ -1102,12 +1117,20 @@ int ws_ctube_ws_handshake(int conn, const struct timeval *timeout)
 		goto err;
 	}
 
+	/* ensure null termination of received data */
+	rbuf[WS_BUFLEN - 1] = '\0';
+
 	if (WS_DEBUG) {
 		printf("get\n%s\n", rbuf);
 	}
 
 	client_key = ws_client_key(rbuf);
-	ws_server_response_key(server_key, client_key);
+	if (client_key == NULL) {
+		goto err;
+	}
+	if (ws_server_response_key(server_key, client_key) != 0) {
+		goto err;
+	}
 
 	snprintf(response, sizeof(response)/sizeof(response[0]), response_fmt, server_key);
 	if (WS_DEBUG) {

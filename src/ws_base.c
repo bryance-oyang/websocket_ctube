@@ -41,6 +41,7 @@ static void ws_print_frame(const char *prefix, char *frame, int len)
 	fflush(stdout);
 }
 
+/** create data frame according to websocket standard */
 int ws_ctube_ws_mkframe(char *frame, const char *msg, size_t msg_size, int first)
 {
 	int payld_size;
@@ -60,6 +61,7 @@ int ws_ctube_ws_mkframe(char *frame, const char *msg, size_t msg_size, int first
 	return payld_size;
 }
 
+/** send data in data frames according to websocket standard */
 int ws_ctube_ws_send(int conn, const char *msg, size_t msg_size)
 {
 	int payld_size;
@@ -104,13 +106,22 @@ int ws_ctube_ws_pong(int conn, const char *msg, int msg_size)
 	return 0;
 }
 
+/** extract the client key from handshake */
 static char *ws_client_key(char *rbuf)
 {
 	char *client_key, *client_key_end;
 
 	client_key = strstr(rbuf, "Sec-WebSocket-Key: ");
+	if (client_key == NULL) {
+		return NULL;
+	}
+
 	client_key += strlen("Sec-WebSocket-Key: ");
 	client_key_end = strstr(client_key, "\r");
+	if (client_key_end == NULL) {
+		return NULL;
+	}
+
 	*client_key_end = '\0';
 	if (WS_DEBUG) {
 		printf("wskey\n%s\n", client_key);
@@ -118,18 +129,16 @@ static char *ws_client_key(char *rbuf)
 	return client_key;
 }
 
+/** compute server response key per websocket standard */
 static int ws_server_response_key(char *server_key, const char *client_key)
 {
 	size_t sha1_hash_len = 20;
 	char magic_client_key[WS_BUFLEN];
 	char client_sha1[WS_BUFLEN];
 
-	strncpy(magic_client_key, client_key, WS_BUFLEN - 1);
-	magic_client_key[WS_BUFLEN - 1] = '\0';
-
-	strncat(magic_client_key, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11",
-		WS_BUFLEN - strlen(magic_client_key) - 1);
-	magic_client_key[WS_BUFLEN - 1] = '\0';
+	if (snprintf(magic_client_key, WS_BUFLEN, "%s258EAFA5-E914-47DA-95CA-C5AB0DC85B11", client_key) >= WS_BUFLEN) {
+		return -1;
+	}
 
 	ws_ctube_sha1sum((unsigned char *)client_sha1, (unsigned char *)magic_client_key, strlen(magic_client_key));
 	ws_ctube_b64_encode((unsigned char *)server_key, (unsigned char *)client_sha1, sha1_hash_len);
@@ -165,12 +174,20 @@ int ws_ctube_ws_handshake(int conn, const struct timeval *timeout)
 		goto err;
 	}
 
+	/* ensure null termination of received data */
+	rbuf[WS_BUFLEN - 1] = '\0';
+
 	if (WS_DEBUG) {
 		printf("get\n%s\n", rbuf);
 	}
 
 	client_key = ws_client_key(rbuf);
-	ws_server_response_key(server_key, client_key);
+	if (client_key == NULL) {
+		goto err;
+	}
+	if (ws_server_response_key(server_key, client_key) != 0) {
+		goto err;
+	}
 
 	snprintf(response, sizeof(response)/sizeof(response[0]), response_fmt, server_key);
 	if (WS_DEBUG) {
