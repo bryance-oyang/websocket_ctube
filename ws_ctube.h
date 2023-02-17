@@ -23,7 +23,7 @@ namespace ws_ctube {
 struct ws_ctube;
 
 /**
- * ws_ctube_open - create a ws_ctube websocket server that must be closed with
+ * ws_ctube_open - create a ws_ctube websocket server. When finished, close with
  * ws_ctube_close()
  *
  * @param port port for websocket server

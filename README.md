@@ -43,7 +43,7 @@ ws_ctube_broadcast(ctube, data, data_size); /* broadcast once */
 /* do more stuff */
 ws_ctube_close(ctube);
 ```
-and compile with `-pthread`. **Important note:** in C++, the C API is namespaced
+Compile with `-pthread`. **Important note:** in C++, the C API is namespaced
 into `ws_ctube::`. You can easily write your own RAII wrapper class for C++ if
 desired.
 
@@ -63,7 +63,7 @@ websocket.onmessage = (event) => {
 ### C API Details
 ```C
 /**
- * ws_ctube_open - create a ws_ctube websocket server that must be closed with
+ * ws_ctube_open - create a ws_ctube websocket server. When finished, close with
  * ws_ctube_close()
  *
  * @param port port for websocket server

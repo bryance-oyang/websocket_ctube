@@ -41,7 +41,7 @@
         width: 100%;
         height: 23rem;
         color: rgb(239, 240, 241);
-        background-color: rgb(63, 60, 65);
+        background-color: #131626;
       }
       #sub_display {
         flex-direction: row;
@@ -83,7 +83,7 @@
       p {
         padding: 0;
         border: 0;
-        margin: 0.8rem;
+        margin: 0.8rem 0 0.8rem 0;
       }
     </style>
   </head>
@@ -173,7 +173,7 @@
         } else {
           // connected
           status_bar.innerHTML = "- Connected to C program -";
-          status_bar.style.backgroundColor = "rgb(62, 85, 171)";
+          status_bar.style.backgroundColor = "#0168C2";
         }
         setTimeout(connection_status_update, 50);
       }
