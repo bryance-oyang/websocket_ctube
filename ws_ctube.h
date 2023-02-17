@@ -364,32 +364,59 @@ void ws_ctube_sha1sum(unsigned char *out, const unsigned char *in, size_t len);
 #define MSG_NOSIGNAL 0
 #endif
 
-static inline int ws_ctube_socket_send_all(int fd, char *buf, size_t len)
+static inline int ws_ctube_socket_send_all(const int fd, const char *buf, ssize_t len)
 {
 	while (len > 0) {
-		int nsent = send(fd, buf, len, MSG_NOSIGNAL);
+		ssize_t nsent = send(fd, buf, len, MSG_NOSIGNAL);
 		if (nsent < 1) {
 			return -1;
 		}
 		buf += nsent;
 		len -= nsent;
 	}
+
 	return 0;
 }
 
-static inline int ws_ctube_socket_recv_all(int fd, char *buf, size_t buf_size, const char *delim)
+
+static inline int ws_ctube_socket_recv_all(const int fd, char *const buf, const ssize_t buf_size, const char *delim)
 {
-	while (buf_size > 0) {
-		int nrecv = recv(fd, buf, buf_size, MSG_NOSIGNAL);
+	char *remain_buf = buf;
+	ssize_t remain_size;
+
+	if (buf_size <= 0) {
+		return 0;
+	}
+
+	if (delim != NULL) {
+		remain_size = buf_size - 1;
+		buf[buf_size - 1] = '\0';
+	} else {
+		remain_size = buf_size;
+	}
+
+	while (remain_size > 0) {
+		ssize_t nrecv = recv(fd, remain_buf, remain_size, MSG_NOSIGNAL);
 		if (nrecv < 1) {
 			return -1;
 		}
-		if (delim != NULL && strstr(buf, delim) != NULL) {
+		remain_buf += nrecv;
+		remain_size -= nrecv;
+
+		/* look for delim */
+		if (delim != NULL && remain_size > 0) {
+			*remain_buf = '\0';
+			char *dpos = strstr(buf, delim);
+			if (dpos == NULL) {
+				continue;
+			}
+
+			dpos += strlen(delim);
+			*dpos = '\0';
 			return 0;
 		}
-		buf += nrecv;
-		buf_size -= nrecv;
 	}
+
 	return 0;
 }
 
@@ -1137,7 +1164,19 @@ int ws_ctube_ws_handshake(int conn, const struct timeval *timeout)
 		printf("server response\n%s\n", response);
 	}
 
-	ws_ctube_socket_send_all(conn, response, strlen(response));
+	/* send with timeout, but reset to old timeout afterwards */
+	if (getsockopt(conn, SOL_SOCKET, SO_SNDTIMEO, &old_timeout, &timeval_size) < 0) {
+		goto err;
+	}
+	if (setsockopt(conn, SOL_SOCKET, SO_SNDTIMEO, timeout, sizeof(*timeout)) < 0) {
+		goto err;
+	}
+	if (ws_ctube_socket_send_all(conn, response, strlen(response)) != 0) {
+		goto err;
+	}
+	if (setsockopt(conn, SOL_SOCKET, SO_SNDTIMEO, &old_timeout, sizeof(old_timeout)) < 0) {
+		goto err;
+	}
 
 	return 0;
 

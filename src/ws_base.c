@@ -194,7 +194,19 @@ int ws_ctube_ws_handshake(int conn, const struct timeval *timeout)
 		printf("server response\n%s\n", response);
 	}
 
-	ws_ctube_socket_send_all(conn, response, strlen(response));
+	/* send with timeout, but reset to old timeout afterwards */
+	if (getsockopt(conn, SOL_SOCKET, SO_SNDTIMEO, &old_timeout, &timeval_size) < 0) {
+		goto err;
+	}
+	if (setsockopt(conn, SOL_SOCKET, SO_SNDTIMEO, timeout, sizeof(*timeout)) < 0) {
+		goto err;
+	}
+	if (ws_ctube_socket_send_all(conn, response, strlen(response)) != 0) {
+		goto err;
+	}
+	if (setsockopt(conn, SOL_SOCKET, SO_SNDTIMEO, &old_timeout, sizeof(old_timeout)) < 0) {
+		goto err;
+	}
 
 	return 0;
 
