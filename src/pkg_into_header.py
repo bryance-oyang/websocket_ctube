@@ -78,15 +78,13 @@ def main():
 
 """)
         hfile.write("#ifndef WS_CTUBE_H\n#define WS_CTUBE_H\n\n")
+        hfile.write("#ifdef __cplusplus\nextern \"C\" {\n#endif /* __cplusplus */\n\n")
 
         hfile.write(ws_ctube_h)
-
-        hfile.write("#ifdef __cplusplus\nextern \"C\" {\n#endif /* __cplusplus */\n\n")
         hfile.write(system_include_str())
-        hfile.write("\n\n#ifdef __cplusplus\n} /* extern \"C\" */\n#endif /* __cplusplus */\n")
-
         hfile.write(code)
 
+        hfile.write("\n\n#ifdef __cplusplus\n} /* extern \"C\" */\n#endif /* __cplusplus */\n")
         hfile.write("\n\n#endif /* WS_CTUBE_H */")
 
 main()

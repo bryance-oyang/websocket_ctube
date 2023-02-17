@@ -1,13 +1,7 @@
 #ifndef WS_CTUBE_H_INCLUDE
 #define WS_CTUBE_H_INCLUDE
 
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
 #include <stddef.h>
-#ifdef __cplusplus
-} /* extern "C" */
-#endif /* __cplusplus */
 
 struct ws_ctube;
 

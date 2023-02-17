@@ -7,16 +7,14 @@
 #ifndef WS_CTUBE_H
 #define WS_CTUBE_H
 
-#ifndef WS_CTUBE_H_INCLUDE
-#define WS_CTUBE_H_INCLUDE
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
+#ifndef WS_CTUBE_H_INCLUDE
+#define WS_CTUBE_H_INCLUDE
+
 #include <stddef.h>
-#ifdef __cplusplus
-} /* extern "C" */
-#endif /* __cplusplus */
 
 struct ws_ctube;
 
@@ -70,10 +68,6 @@ void ws_ctube_close(struct ws_ctube *ctube);
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 
 #endif /* WS_CTUBE_H_INCLUDE */
-#ifdef __cplusplus
-extern "C" {
-#endif /* __cplusplus */
-
 #include <pthread.h>
 #include <signal.h>
 #include <stddef.h>
@@ -86,11 +80,6 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 #include <float.h>
-
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif /* __cplusplus */
 #ifndef WS_CTUBE_CONTAINER_OF_H
 #define WS_CTUBE_CONTAINER_OF_H
 
@@ -1823,6 +1812,11 @@ out_ratelim:
 out_nolock:
 	return retval;
 }
+
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif /* __cplusplus */
 
 
 #endif /* WS_CTUBE_H */

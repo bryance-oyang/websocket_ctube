@@ -118,7 +118,7 @@ This section describes the internal workings of `websocket_ctube`. This is for
 documentation purposes only and is not needed to use the API.
 
 A picture is worth a thousand words:
-![architecture](arch.png)
+![architecture_img](arch.png)
 
 When the main thread calls `ws_ctube_open()`, a server thread and connection
 handler thread are created.
@@ -140,8 +140,8 @@ thread calls `ws_ctube_broadcast()`, a `ws_ctube_data` is created and data is
 memcpy'ed into it. The main thread then wakes the writers. At this point,
 `ws_ctube_broadcast()` returns and the main thread can continue.
 
-When a writer wakes, it acquires a reference to the current `ws_ctube_data` and
-sends the data to its client via data frames according to the WebSocket
+When writers wake, they acquire references to the current `ws_ctube_data` and
+send the data to their clients via data frames according to the WebSocket
 standard. Having one writer per client means that clients cannot block each
 other.
 
