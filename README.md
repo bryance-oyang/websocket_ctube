@@ -43,7 +43,8 @@ ws_ctube_broadcast(ctube, data, data_size); /* broadcast once */
 /* do more stuff */
 ws_ctube_close(ctube);
 ```
-and compile with `-pthread`. **Note:** in C++, the C API is namespaced into `ws_ctube::`.
+and compile with `-pthread`. **Important note:** in C++, the C API is namespaced
+into `ws_ctube::`. You can easily write your own RAII wrapper class for C++.
 
 On the browser side, we can read the broadcasted data with standard JavaScript:
 ```js
@@ -111,5 +112,5 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 ```
 
 ## Internal Architecture
-WIP: This section describes the internal workings of `websocket_ctube`. This is for
+This section describes the internal workings of `websocket_ctube`. This is for
 documentation purposes only and is not needed to use the API.
