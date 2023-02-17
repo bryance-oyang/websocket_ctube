@@ -115,3 +115,25 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 ## Internal Architecture
 This section describes the internal workings of `websocket_ctube`. This is for
 documentation purposes only and is not needed to use the API.
+
+A picture is worth a thousand words:
+![architecture](arch.png)
+
+When a new connection is established, the server thread accepts and creates a
+new `conn_struct` for it and queues it for WebSocket handshaking in the FIFO work-queue `connq`. The
+connection handler thread will pop from `connq` and complete the handshake. If
+successful, one reader and one writer thread will be spawned for that
+connection.
+
+The reader threads listen for incoming data and respond to pings with pongs
+(TODO). If a client disconnects, its reader will queue the disconnect in
+`connq`. The connection handler thread will pop from `connq` and close/cleanup
+the connection and `conn_struct`.
+
+The writer threads are responsible for the data broadcasting. When the main
+thread calls `ws_ctube_broadcast()`, a `ws_ctube_data` is created and data is
+memcpy'ed into it. The main thread then wakes the writers. At this point, `ws_ctube_broadcast()` returns and the main thread can continue.
+
+When a writer wakes, it acquires a reference to the current `ws_ctube_data` and
+sends the data to its client via data frames according to the WebSocket
+standard.
