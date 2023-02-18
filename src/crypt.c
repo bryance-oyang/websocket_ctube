@@ -11,8 +11,16 @@ static volatile int ws_ctube_b64_encode_inited = 0;
 static volatile unsigned char ws_ctube_b64_encode_table[64];
 static const uint32_t ws_ctube_b64_mask = 63;
 
+/**
+ * 0-25: A-Z
+ * 26-51: a-z
+ * 52-61: 0-9
+ * 62: +
+ * 63: /
+ */
 static void ws_ctube_init_b64_encode_table()
 {
+	/* prevent double init */
 	if (__atomic_exchange_n(&ws_ctube_b64_encode_inited, (int)1, __ATOMIC_SEQ_CST))
 		return;
 
@@ -75,6 +83,7 @@ static inline uint32_t ws_ctube_left_rotate(uint32_t w, uint32_t amount)
 	return (w << amount) | (w >> (32 - amount));
 }
 
+/** see sha1 standard */
 static inline void ws_ctube_sha1_wordgen(uint32_t *const word)
 {
 	for (int i = 16; i < 80; i++) {
@@ -82,6 +91,7 @@ static inline void ws_ctube_sha1_wordgen(uint32_t *const word)
 	}
 }
 
+/** generate words 14,15 from input length (see sha1 standard) */
 static inline void ws_ctube_sha1_total_len_cpy(uint32_t *words, const uint64_t total_bits)
 {
 	const uint64_t mask = 0xFF;
@@ -96,6 +106,7 @@ static inline void ws_ctube_sha1_total_len_cpy(uint32_t *words, const uint64_t t
 	}
 }
 
+/** copy byte stream into sha1 32-byte words */
 static inline void ws_ctube_sha1_cp_to_words(uint32_t *const words, const uint8_t *const in, const size_t len, int pad)
 {
 	size_t i, w_ind, byte_ind;
@@ -110,6 +121,7 @@ static inline void ws_ctube_sha1_cp_to_words(uint32_t *const words, const uint8_
 	}
 }
 
+/** genearte all sha1 words (see sha1 standard) */
 static inline void ws_ctube_sha1_mkwords(uint32_t *const words, const uint8_t *const in, const size_t len, const int mode, const uint64_t total_bits)
 {
 	for (int i = 0; i < 16; i++) {
