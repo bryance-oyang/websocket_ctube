@@ -6,3 +6,4 @@ a.out
 vgcore.*
 latex/
 html/
+.vscode/
