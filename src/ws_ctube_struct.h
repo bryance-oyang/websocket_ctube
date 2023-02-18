@@ -250,9 +250,8 @@ static void _ws_ctube_data_list_clear(struct ws_ctube_list *dlist)
 	struct ws_ctube_list_node *node;
 	struct ws_ctube_data *data;
 
-	while ((node = ws_ctube_list_lockpop_front(dlist)) != NULL) {
+	while ((node = ws_ctube_list_pop_front(dlist)) != NULL) {
 		data = ws_ctube_container_of(node, typeof(*data), lnode);
-		pthread_mutex_unlock(&node->mutex);
 		ws_ctube_data_free(data);
 	}
 }
@@ -262,9 +261,8 @@ static void _ws_ctube_connq_clear(struct ws_ctube_list *connq)
 	struct ws_ctube_list_node *node;
 	struct ws_ctube_conn_qentry *qentry;
 
-	while ((node = ws_ctube_list_lockpop_front(connq)) != NULL) {
+	while ((node = ws_ctube_list_pop_front(connq)) != NULL) {
 		qentry = ws_ctube_container_of(node, typeof(*qentry), lnode);
-		pthread_mutex_unlock(&node->mutex);
 		ws_ctube_conn_qentry_free(qentry);
 	}
 }

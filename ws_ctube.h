@@ -82,6 +82,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 #ifndef WS_CTUBE_CONTAINER_OF_H
 #define WS_CTUBE_CONTAINER_OF_H
 
+
 #define ws_ctube_container_of(ptr, type, member) ({ \
 	typeof(((type *)0)->member) *_container_of_ptr = ptr; \
 	((type *)((char *)(_container_of_ptr) - offsetof(type, member)));})
@@ -210,19 +211,19 @@ static void _ws_ctube_list_node_unlink(struct ws_ctube_list_node *node)
 
 static inline void ws_ctube_list_unlink(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
-	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
+	pthread_mutex_lock(&node->mutex);
 	_ws_ctube_list_node_unlink(node);
 	l->len--;
-	pthread_mutex_unlock(&l->mutex);
 	pthread_mutex_unlock(&node->mutex);
+	pthread_mutex_unlock(&l->mutex);
 }
 
 static inline int ws_ctube_list_push_front(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
 	int retval = 0;
-	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
+	pthread_mutex_lock(&node->mutex);
 
 	if (node->next != NULL || node->prev != NULL) {
 		retval = -1;
@@ -232,16 +233,16 @@ static inline int ws_ctube_list_push_front(struct ws_ctube_list *l, struct ws_ct
 	l->len++;
 
 out:
-	pthread_mutex_unlock(&l->mutex);
 	pthread_mutex_unlock(&node->mutex);
+	pthread_mutex_unlock(&l->mutex);
 	return retval;
 }
 
 static inline int ws_ctube_list_push_back(struct ws_ctube_list *l, struct ws_ctube_list_node *node)
 {
 	int retval = 0;
-	pthread_mutex_lock(&node->mutex);
 	pthread_mutex_lock(&l->mutex);
+	pthread_mutex_lock(&node->mutex);
 
 	if (node->next != NULL || node->prev != NULL) {
 		retval = -1;
@@ -251,76 +252,58 @@ static inline int ws_ctube_list_push_back(struct ws_ctube_list *l, struct ws_ctu
 	l->len++;
 
 out:
-	pthread_mutex_unlock(&l->mutex);
 	pthread_mutex_unlock(&node->mutex);
+	pthread_mutex_unlock(&l->mutex);
 	return retval;
 }
 
-
-static inline struct ws_ctube_list_node *ws_ctube_list_lockpop_front(struct ws_ctube_list *l)
+static inline struct ws_ctube_list_node *ws_ctube_list_pop_front(struct ws_ctube_list *l)
 {
 	struct ws_ctube_list_node *front;
 
-	/* optimistically lock front mutex but check front is still front */
-	for (;;) {
-		front = l->head.next;
-
-		pthread_mutex_lock(&front->mutex);
-		pthread_mutex_lock(&l->mutex);
-		if (front == &l->head) {
-			pthread_mutex_unlock(&l->mutex);
-			pthread_mutex_unlock(&front->mutex);
-			return NULL;
-		} else if (front != l->head.next) {
-			pthread_mutex_unlock(&l->mutex);
-			pthread_mutex_unlock(&front->mutex);
-			continue;
-		} else {
-			break;
-		}
+	pthread_mutex_lock(&l->mutex);
+	if (l->len == 0) {
+		pthread_mutex_unlock(&l->mutex);
+		return NULL;
 	}
+	front = l->head.next;
+	pthread_mutex_lock(&front->mutex);
 
 	_ws_ctube_list_node_unlink(front);
 	l->len--;
+
+	pthread_mutex_unlock(&front->mutex);
 	pthread_mutex_unlock(&l->mutex);
 	return front;
 }
 
-
-static inline struct ws_ctube_list_node *ws_ctube_list_lockpop_back(struct ws_ctube_list *l)
+static inline struct ws_ctube_list_node *ws_ctube_list_pop_back(struct ws_ctube_list *l)
 {
 	struct ws_ctube_list_node *back;
 
-	/* optimistically lock back mutex but check back is still back */
-	for (;;) {
-		back = l->head.prev;
-
-		pthread_mutex_lock(&back->mutex);
-		pthread_mutex_lock(&l->mutex);
-		if (back == &l->head) {
-			pthread_mutex_unlock(&l->mutex);
-			pthread_mutex_unlock(&back->mutex);
-			return NULL;
-		} else if (back != l->head.prev) {
-			pthread_mutex_unlock(&l->mutex);
-			pthread_mutex_unlock(&back->mutex);
-			continue;
-		} else {
-			break;
-		}
+	pthread_mutex_lock(&l->mutex);
+	if (l->len == 0) {
+		pthread_mutex_unlock(&l->mutex);
+		return NULL;
 	}
+	back = l->head.prev;
+	pthread_mutex_lock(&back->mutex);
 
 	_ws_ctube_list_node_unlink(back);
 	l->len--;
+
+	pthread_mutex_unlock(&back->mutex);
 	pthread_mutex_unlock(&l->mutex);
 	return back;
 }
+
 
 #define ws_ctube_list_for_each(list, node) \
 	for ( \
 	node = (list)->head.next; \
 	node != &((list)->head); \
 	node = node->next)
+
 
 #define ws_ctube_list_for_each_entry(list, entry, member) \
 	for ( \
@@ -681,9 +664,8 @@ static void _ws_ctube_data_list_clear(struct ws_ctube_list *dlist)
 	struct ws_ctube_list_node *node;
 	struct ws_ctube_data *data;
 
-	while ((node = ws_ctube_list_lockpop_front(dlist)) != NULL) {
+	while ((node = ws_ctube_list_pop_front(dlist)) != NULL) {
 		data = ws_ctube_container_of(node, typeof(*data), lnode);
-		pthread_mutex_unlock(&node->mutex);
 		ws_ctube_data_free(data);
 	}
 }
@@ -693,9 +675,8 @@ static void _ws_ctube_connq_clear(struct ws_ctube_list *connq)
 	struct ws_ctube_list_node *node;
 	struct ws_ctube_conn_qentry *qentry;
 
-	while ((node = ws_ctube_list_lockpop_front(connq)) != NULL) {
+	while ((node = ws_ctube_list_pop_front(connq)) != NULL) {
 		qentry = ws_ctube_container_of(node, typeof(*qentry), lnode);
-		pthread_mutex_unlock(&node->mutex);
 		ws_ctube_conn_qentry_free(qentry);
 	}
 }
@@ -1361,7 +1342,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 	struct ws_ctube_list_node *node;
 	struct ws_ctube_conn_struct *conn;
 
-	while ((node = ws_ctube_list_lockpop_front(connq)) != NULL) {
+	while ((node = ws_ctube_list_pop_front(connq)) != NULL) {
 		qentry = ws_ctube_container_of(node, typeof(*qentry), lnode);
 		conn = qentry->conn;
 
@@ -1397,7 +1378,6 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 			break;
 		}
 
-		pthread_mutex_unlock(&node->mutex);
 		ws_ctube_conn_qentry_free(qentry);
 	}
 }
@@ -1411,7 +1391,7 @@ static void _ws_ctube_cleanup_conn_list(void *arg)
 	struct ws_ctube_list_node *node;
 	struct ws_ctube_conn_struct *conn;
 
-	while ((node = ws_ctube_list_lockpop_front(conn_list)) != NULL) {
+	while ((node = ws_ctube_list_pop_front(conn_list)) != NULL) {
 		conn = ws_ctube_container_of(node, typeof(*conn), lnode);
 
 		pthread_mutex_lock(&conn->stopping_mutex);
@@ -1423,7 +1403,6 @@ static void _ws_ctube_cleanup_conn_list(void *arg)
 			pthread_mutex_unlock(&conn->stopping_mutex);
 		}
 
-		pthread_mutex_unlock(&node->mutex);
 		ws_ctube_ref_count_release(conn, refc, ws_ctube_conn_struct_free);
 	}
 
