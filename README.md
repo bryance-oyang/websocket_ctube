@@ -41,7 +41,8 @@ example source code.
 ```C
 #include "ws_ctube.h"
 
-struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms, max_broadcast_fps);
+struct ws_ctube *ctube = ws_ctube_open(port, max_nclient, timeout_ms,
+max_broadcast_fps);
 /* do stuff */
 ws_ctube_broadcast(ctube, data, data_size); /* broadcast once */
 /* do more stuff */
