@@ -5,7 +5,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  *
- * The contents of this file are copied from ./src by ./pkg.sh
+ * === websocket_ctube ===
+ *
+ * View README.md for usage info and documentation.
+ *
+ * The contents of this file are copied from ./src by ./pkg.sh in the
+ * websocket_ctube distribution
  */
 
 #ifndef WS_CTUBE_H
