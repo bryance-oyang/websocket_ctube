@@ -27,7 +27,8 @@ static void _ws_ctube_cleanup_unlock_mutex(void *mutex)
 	pthread_mutex_unlock((pthread_mutex_t *)mutex);
 }
 
-static int _ws_ctube_connq_push(struct ws_ctube *ctube, struct ws_ctube_conn_struct *conn, enum ws_ctube_qaction act)
+/** push a work item (start/stop connection) onto the FIFO connq */
+static int ws_ctube_connq_push(struct ws_ctube *ctube, struct ws_ctube_conn_struct *conn, enum ws_ctube_qaction act)
 {
 	int retval = 0;
 	struct ws_ctube_conn_qentry *qentry = (typeof(qentry))malloc(sizeof(*qentry));
@@ -57,6 +58,7 @@ out_noalloc:
 	return retval;
 }
 
+/** handles incoming data from client */
 static void *ws_ctube_reader_main(void *arg)
 {
 	struct ws_ctube_conn_struct *conn = (struct ws_ctube_conn_struct *)arg;
@@ -66,7 +68,7 @@ static void *ws_ctube_reader_main(void *arg)
 	for (;;) {
 		/* TODO: handle ping/pong */
 		if (recv(conn->fd, buf, WS_CTUBE_BUFLEN, MSG_NOSIGNAL) < 1) {
-			_ws_ctube_connq_push(ctube, conn, WS_CTUBE_CONN_STOP);
+			ws_ctube_connq_push(ctube, conn, WS_CTUBE_CONN_STOP);
 			if (WS_CTUBE_DEBUG) {
 				printf("ws_ctube_reader_main(): disconnected client\n");
 				fflush(stdout);
@@ -78,12 +80,14 @@ static void *ws_ctube_reader_main(void *arg)
 	return NULL;
 }
 
+/** ensures data is released even if writer is cancelled */
 static void _ws_ctube_cleanup_release_ws_ctube_data(void *arg)
 {
 	struct ws_ctube_data *ws_ctube_data = (struct ws_ctube_data *)arg;
 	ws_ctube_ref_count_release(ws_ctube_data, refc, ws_ctube_data_free);
 }
 
+/** sends broadcast data to client */
 static void *ws_ctube_writer_main(void *arg)
 {
 	struct ws_ctube_conn_struct *conn = (struct ws_ctube_conn_struct *)arg;
@@ -93,6 +97,7 @@ static void *ws_ctube_writer_main(void *arg)
 	int send_retval;
 
 	for (;;) {
+		/* wait until new data is needed to be broadcast by checking data id */
 		pthread_mutex_lock(&ctube->out_data_mutex);
 		pthread_cleanup_push(_ws_ctube_cleanup_unlock_mutex, &ctube->out_data_mutex);
 		while (out_data_id == ctube->out_data_id) {
@@ -106,11 +111,13 @@ static void *ws_ctube_writer_main(void *arg)
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_unlock_mutex */
 		pthread_mutex_unlock(&ctube->out_data_mutex);
 
+		/* broadcast data in a cancellable way */
 		pthread_cleanup_push(_ws_ctube_cleanup_release_ws_ctube_data, out_data);
 		send_retval = ws_ctube_ws_send(conn->fd, (char *)out_data->data, out_data->data_size);
 		pthread_cleanup_pop(0); /* _ws_ctube_cleanup_release_ws_ctube_data */
 		ws_ctube_ref_count_release(out_data, refc, ws_ctube_data_free);
 
+		/* TODO: error handling of failed broadcast */
 		if (send_retval != 0) {
 			continue;
 		}
@@ -143,6 +150,7 @@ static void _ws_ctube_cancel_writer(void *arg)
 	pthread_setcancelstate(oldstate, &statevar);
 }
 
+/** start reader/writer threads for a client */
 static int ws_ctube_conn_struct_start(struct ws_ctube_conn_struct *conn)
 {
 	int retval = 0;
@@ -168,6 +176,7 @@ out_noreader:
 	return retval;
 }
 
+/** cancels reader/writer threads for a client */
 static void ws_ctube_conn_struct_stop(struct ws_ctube_conn_struct *conn)
 {
 	int oldstate, statevar;
@@ -194,6 +203,7 @@ static void _ws_ctube_conn_list_remove(struct ws_ctube_list *conn_list, struct w
 	ws_ctube_ref_count_release(conn, refc, ws_ctube_conn_struct_free);
 }
 
+/** process work item from FIFO connq (start/stop connection) */
 static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct ws_ctube_list *conn_list, int max_nclient)
 {
 	struct ws_ctube_conn_qentry *qentry;
@@ -207,6 +217,8 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 		switch (qentry->act) {
 		case WS_CTUBE_CONN_START:
 			pthread_mutex_lock(&conn_list->mutex);
+
+			/* refuse new connections if limit exceeded*/
 			if (conn_list->len >= max_nclient) {
 				pthread_mutex_unlock(&conn_list->mutex);
 				fprintf(stderr, "ws_ctube_handler_process_queue(): max_nclient reached\n");
@@ -216,6 +228,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 				pthread_mutex_unlock(&conn_list->mutex);
 			}
 
+			/* do websocket handshake */
 			if (ws_ctube_ws_handshake(conn->fd, &conn->ctube->timeout_val) == 0) {
 				ws_ctube_conn_struct_start(conn);
 				_ws_ctube_conn_list_add(conn_list, conn);
@@ -224,6 +237,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 
 		case WS_CTUBE_CONN_STOP:
 			pthread_mutex_lock(&conn->stopping_mutex);
+			/* prevent double stop */
 			if (!conn->stopping) {
 				conn->stopping = 1;
 				pthread_mutex_unlock(&conn->stopping_mutex);
@@ -240,6 +254,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 	}
 }
 
+/** stop all client connections and cleanup */
 static void _ws_ctube_cleanup_conn_list(void *arg)
 {
 	int oldstate, statevar;
@@ -253,6 +268,7 @@ static void _ws_ctube_cleanup_conn_list(void *arg)
 		conn = ws_ctube_container_of(node, typeof(*conn), lnode);
 
 		pthread_mutex_lock(&conn->stopping_mutex);
+		/* prevent double stop */
 		if (!conn->stopping) {
 			conn->stopping = 1;
 			pthread_mutex_unlock(&conn->stopping_mutex);
@@ -267,6 +283,7 @@ static void _ws_ctube_cleanup_conn_list(void *arg)
 	pthread_setcancelstate(oldstate, &statevar);
 }
 
+/** connection handler thread: handles new clients via handshake or cleans up disconnected clients */
 static void *ws_ctube_handler_main(void *arg)
 {
 	struct ws_ctube *ctube = (struct ws_ctube *)arg;
@@ -276,6 +293,7 @@ static void *ws_ctube_handler_main(void *arg)
 	pthread_cleanup_push(_ws_ctube_cleanup_conn_list, &conn_list);
 
 	for (;;) {
+		/* wait for work items in FIFO connq */
 		pthread_mutex_lock(&ctube->connq_mutex);
 		pthread_cleanup_push(_ws_ctube_cleanup_unlock_mutex, &ctube->connq_mutex);
 		while (!ctube->connq_pred) {
@@ -292,6 +310,7 @@ static void *ws_ctube_handler_main(void *arg)
 	return NULL;
 }
 
+/* closes client socket on error */
 static void _ws_ctube_cleanup_close_client_conn(void *arg)
 {
 	int oldstate, statevar;
@@ -305,13 +324,14 @@ static void _ws_ctube_cleanup_close_client_conn(void *arg)
 	pthread_setcancelstate(oldstate, &statevar);
 }
 
-static int _ws_ctube_serve_accept_new_conn(struct ws_ctube *ctube, const int server_sock)
+static int ws_ctube_server_accept_new_conn(struct ws_ctube *ctube, const int server_sock)
 {
 	int retval = 0;
 
 	int conn_fd = accept(server_sock, NULL, NULL);
 	pthread_cleanup_push(_ws_ctube_cleanup_close_client_conn, &conn_fd);
 
+	/* create new conn_struct for client */
 	struct ws_ctube_conn_struct *conn = (typeof(conn))malloc(sizeof(*conn));
 	if (conn == NULL) {
 		retval = -1;
@@ -323,11 +343,12 @@ static int _ws_ctube_serve_accept_new_conn(struct ws_ctube *ctube, const int ser
 		retval = -1;
 		goto out_noinit;
 	}
-	/* ws_ctube_conn_struct_destroy closes conn_fd now; this prevents _ws_ctube_cleanup_close_client_conn() from closing it */
+	/* ws_ctube_conn_struct_destroy() closes conn_fd now; this prevents _ws_ctube_cleanup_close_client_conn() from closing it */
 	conn_fd = -1;
 	pthread_cleanup_push((cleanup_func)ws_ctube_conn_struct_destroy, conn);
 
-	if (_ws_ctube_connq_push(ctube, conn, WS_CTUBE_CONN_START) != 0) {
+	/* push work item to connection handler to do handshake and start reader/writer */
+	if (ws_ctube_connq_push(ctube, conn, WS_CTUBE_CONN_START) != 0) {
 		retval = -1;
 		goto out_nopush;
 	}
@@ -346,13 +367,14 @@ static void ws_ctube_serve_forever(struct ws_ctube *ctube)
 	const int server_sock = ctube->server_sock;
 
 	for (;;) {
-		if (_ws_ctube_serve_accept_new_conn(ctube, server_sock) != 0) {
+		if (ws_ctube_server_accept_new_conn(ctube, server_sock) != 0) {
 			fprintf(stderr, "ws_ctube_serve_forever(): error\n");
 			fflush(stderr);
 		}
 	}
 }
 
+/** alert main thread if the server fails to init by setting flag */
 static void _ws_ctube_server_init_fail(void *arg)
 {
 	int oldstate, statevar;
@@ -416,7 +438,7 @@ static void *ws_ctube_server_main(void *arg)
 		goto out_err;
 	}
 
-	/* success */
+	/* success: alert main thread by setting flag */
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	ctube->server_inited = 1;
 	pthread_mutex_unlock(&ctube->server_init_mutex);
@@ -455,6 +477,7 @@ static void _ws_ctube_cancel_server(void *arg)
 	pthread_setcancelstate(oldstate, &statevar);
 }
 
+/* start connection handler and server threads */
 static int ws_ctube_start(struct ws_ctube *ctube)
 {
 	int retval = 0;
@@ -473,6 +496,7 @@ static int ws_ctube_start(struct ws_ctube *ctube)
 	}
 	pthread_cleanup_push(_ws_ctube_cancel_server, ctube);
 
+	/* wait for server thread to report success/failure to start */
 	pthread_mutex_lock(&ctube->server_init_mutex);
 	pthread_cleanup_push(_ws_ctube_cleanup_unlock_mutex, &ctube->server_init_mutex);
 	if (ctube->timeout_spec.tv_nsec > 0 || ctube->timeout_spec.tv_sec > 0) {
@@ -500,6 +524,7 @@ out_nohandler:
 	return retval;
 }
 
+/** stop connection handler and server threads */
 static void ws_ctube_stop(struct ws_ctube *ctube)
 {
 	int oldstate, statevar;
@@ -613,10 +638,12 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 		}
 	}
 
-	/* alloc new out_data */
+	/* release old out_data if held */
 	if (ctube->out_data != NULL) {
 		ws_ctube_ref_count_release(ctube->out_data, refc, ws_ctube_data_free);
 	}
+
+	/* alloc new out_data */
 	ctube->out_data = (typeof(ctube->out_data))malloc(sizeof(*ctube->out_data));
 	if (ctube->out_data == NULL) {
 		retval = -1;
@@ -630,7 +657,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 		goto out_noinit;
 	}
 	ws_ctube_ref_count_acquire(ctube->out_data, refc);
-	ctube->out_data_id++;
+	ctube->out_data_id++; /* unique id for out_data */
 
 	/* record broadcast time for rate-limiting next time */
 	if (max_bcast_fps > 0) {
