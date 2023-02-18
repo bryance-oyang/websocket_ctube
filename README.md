@@ -6,9 +6,9 @@ running (it implements a simple non-blocking WebSocket broadcast server).
 Modern web technology can then be harnessed to monitor or visualize data in
 real-time.
 
-Initialize with `ws_ctube_open()` and call `ws_ctube_broadcast()` to send
-arbitrary data to all connected browsers via the WebSocket standard. The main
-C/C++ program thread can continue to run while the network operations are
+Initialize with `ws_ctube_open()` and call `ws_ctube_broadcast()` as desired to
+send arbitrary data to all connected browsers via the WebSocket standard. The
+main C/C++ program thread can continue to run while the network operations are
 handled by `websocket_ctube` in separate threads.
 
 Simply include `ws_ctube.h` in your project and compile with `-pthread`.
