@@ -95,6 +95,6 @@ def main():
         hfile.write(code)
 
         hfile.write("\n\n#ifdef __cplusplus\n} /* extern \"C\" */\n#endif /* __cplusplus */\n")
-        hfile.write("\n\n#endif /* WS_CTUBE_H */")
+        hfile.write("\n\n#endif /* WS_CTUBE_H */\n")
 
 main()
