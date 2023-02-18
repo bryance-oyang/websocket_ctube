@@ -91,7 +91,7 @@ def main():
  * View README.md for usage info and documentation.
  *
  * The contents of this file are copied from ./src by ./pkg.sh in the
- * websocket_ctube distribution
+ * websocket_ctube distribution.
  */
 
 """)
