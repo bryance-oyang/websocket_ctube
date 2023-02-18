@@ -115,7 +115,8 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
  * struct a *a_ptr;
  * struct c *c_ptr = &a_ptr->cmember;
  *
- * a_ptr == ws_ctube_container_of(c_ptr, struct a, cmember)  */
+ * assert(a_ptr == ws_ctube_container_of(c_ptr, struct a, cmember))
+ */
 #define ws_ctube_container_of(ptr, type, member) ({ \
 	typeof(((type *)0)->member) *_ws_ctube_container_of_ptr = (ptr); \
 	((type *)((char *)(_ws_ctube_container_of_ptr) - offsetof(type, member)));})
