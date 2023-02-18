@@ -20,6 +20,8 @@
 #include <string.h>
 #include <float.h>
 
+#include "likely.h"
+#include "container_of.h"
 #include "ws_ctube_include.h"
 #include "ws_base.h"
 #include "ws_ctube_struct.h"
@@ -621,7 +623,7 @@ void ws_ctube_close(struct ws_ctube *ctube)
 
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
 {
-	if (data_size == 0) {
+	if (ws_ctube_unlikely(data_size == 0)) {
 		return 0;
 	}
 
@@ -638,7 +640,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	if (max_bcast_fps > 0) {
 
 #ifdef CLOCK_MONOTONIC
-		if (clock_gettime(CLOCK_MONOTONIC, &cur_time) != 0) {
+		if (ws_ctube_unlikely(clock_gettime(CLOCK_MONOTONIC, &cur_time) != 0)) {
 			clock_gettime(CLOCK_REALTIME, &cur_time);
 		}
 #else
@@ -661,14 +663,14 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 
 	/* alloc new out_data */
 	ctube->out_data = (typeof(ctube->out_data))malloc(sizeof(*ctube->out_data));
-	if (ctube->out_data == NULL) {
+	if (ws_ctube_unlikely(ctube->out_data == NULL)) {
 		retval = -1;
 		goto out_nodata;
 	}
 	pthread_cleanup_push(free, ctube->out_data);
 
 	/* init and memcpy into out_data */
-	if (ws_ctube_data_init(ctube->out_data, data, data_size) != 0) {
+	if (ws_ctube_unlikely(ws_ctube_data_init(ctube->out_data, data, data_size) != 0)) {
 		retval = -1;
 		goto out_noinit;
 	}

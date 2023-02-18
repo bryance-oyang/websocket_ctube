@@ -92,6 +92,13 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 #include <float.h>
 
 
+#ifndef WS_CTUBE_LIKELY_H
+#define WS_CTUBE_LIKELY_H
+
+#define ws_ctube_likely(x) __builtin_expect(!!(x), 1)
+#define ws_ctube_unlikely(x) __builtin_expect(!!(x), 0)
+
+#endif /* WS_CTUBE_LIKELY_H */
 #ifndef WS_CTUBE_CONTAINER_OF_H
 #define WS_CTUBE_CONTAINER_OF_H
 
@@ -135,7 +142,7 @@ static void ws_ctube_ref_count_destroy(struct ws_ctube_ref_count *ref_count)
 		_Static_assert(__builtin_types_compatible_p(typeof((ptr)->ref_count_member), struct ws_ctube_ref_count), "type mismatch in ws_ctube_ref_count_release()"); \
 		const int _ref_count_refc = __atomic_sub_fetch(&(ptr)->ref_count_member.refc, (int)1, __ATOMIC_SEQ_CST); \
 		if (_ref_count_refc <= 0) { \
-			if (__builtin_expect(_ref_count_refc == 0, 1)) { \
+			if (ws_ctube_likely(_ref_count_refc == 0)) { \
 				release_routine(ptr); \
 			} else { \
 				raise(SIGSEGV); \
@@ -150,7 +157,7 @@ static void ws_ctube_ref_count_destroy(struct ws_ctube_ref_count *ref_count)
 #define ws_ctube_ref_count_release(ptr, ref_count_member, release_routine) do { \
 		const int _ref_count_refc = __atomic_sub_fetch(&(ptr)->ref_count_member.refc, (int)1, __ATOMIC_SEQ_CST); \
 		if (_ref_count_refc <= 0) { \
-			if (__builtin_expect(_ref_count_refc == 0, 1)) { \
+			if (ws_ctube_likely(_ref_count_refc == 0)) { \
 				release_routine(ptr); \
 			} else { \
 				raise(SIGSEGV); \
@@ -1813,7 +1820,7 @@ void ws_ctube_close(struct ws_ctube *ctube)
 
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
 {
-	if (data_size == 0) {
+	if (ws_ctube_unlikely(data_size == 0)) {
 		return 0;
 	}
 
@@ -1830,7 +1837,7 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	if (max_bcast_fps > 0) {
 
 #ifdef CLOCK_MONOTONIC
-		if (clock_gettime(CLOCK_MONOTONIC, &cur_time) != 0) {
+		if (ws_ctube_unlikely(clock_gettime(CLOCK_MONOTONIC, &cur_time) != 0)) {
 			clock_gettime(CLOCK_REALTIME, &cur_time);
 		}
 #else
@@ -1853,14 +1860,14 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 
 	/* alloc new out_data */
 	ctube->out_data = (typeof(ctube->out_data))malloc(sizeof(*ctube->out_data));
-	if (ctube->out_data == NULL) {
+	if (ws_ctube_unlikely(ctube->out_data == NULL)) {
 		retval = -1;
 		goto out_nodata;
 	}
 	pthread_cleanup_push(free, ctube->out_data);
 
 	/* init and memcpy into out_data */
-	if (ws_ctube_data_init(ctube->out_data, data, data_size) != 0) {
+	if (ws_ctube_unlikely(ws_ctube_data_init(ctube->out_data, data, data_size) != 0)) {
 		retval = -1;
 		goto out_noinit;
 	}
