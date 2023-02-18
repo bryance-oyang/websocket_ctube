@@ -41,8 +41,8 @@ def system_include_str() -> str:
         result += f"#include <{hfile}>\n"
     return result
 
-def rm_one_comment(code: str):
-    return re.sub(r"/\*.*?\*/", "", code, flags=re.DOTALL, count=1)
+def rm_top_comment(code: str):
+    return re.sub(r"^/\*.*?\*/", "", code, flags=re.DOTALL, count=1)
 
 def pkg_from(src: TextIOWrapper) -> str:
     out_code = ""
@@ -63,7 +63,10 @@ def pkg_from(src: TextIOWrapper) -> str:
             out_code += line.split("//")[0]
 
     # remove first comment
-    out_code = rm_one_comment(out_code)
+    out_code = rm_top_comment(out_code)
+
+    # remove doxygen
+    out_code = re.sub(r"/\*\*(.*?)(@file)(.*?)\*/", "", out_code, flags=re.DOTALL, count=1)
 
     return out_code
 
@@ -77,9 +80,6 @@ def main():
     for fname in file_list:
         with open(fname, "r") as f:
             code += pkg_from(f)
-
-    # remove doxygen @file comments
-    code = re.sub(r"/\*\*(.*?)(@file)(.*?)\*/", "", code, flags=re.DOTALL)
 
     with open(DEST_HEADER, "w") as hfile:
         hfile.write(
@@ -102,7 +102,7 @@ def main():
         hfile.write("#ifndef WS_CTUBE_H\n#define WS_CTUBE_H\n")
         hfile.write("#ifdef __cplusplus\nextern \"C\" {\n#endif /* __cplusplus */\n\n")
 
-        hfile.write(rm_one_comment(ws_ctube_h))
+        hfile.write(rm_top_comment(ws_ctube_h))
         hfile.write(system_include_str())
         hfile.write(code)
 

@@ -49,9 +49,9 @@ static void ws_ctube_ref_count_destroy(struct ws_ctube_ref_count *ref_count)
 
 #define ws_ctube_ref_count_release(ptr, ref_count_member, release_routine) do { \
 		_Static_assert(__builtin_types_compatible_p(typeof((ptr)->ref_count_member), struct ws_ctube_ref_count), "type mismatch in ws_ctube_ref_count_release()"); \
-		const int _ref_count_refc = __atomic_sub_fetch(&(ptr)->ref_count_member.refc, (int)1, __ATOMIC_SEQ_CST); \
-		if (_ref_count_refc <= 0) { \
-			if (ws_ctube_likely(_ref_count_refc == 0)) { \
+		const int _ws_ctube_ref_count_refc = __atomic_sub_fetch(&(ptr)->ref_count_member.refc, (int)1, __ATOMIC_SEQ_CST); \
+		if (_ws_ctube_ref_count_refc <= 0) { \
+			if (ws_ctube_likely(_ws_ctube_ref_count_refc == 0)) { \
 				release_routine(ptr); \
 			} else { \
 				raise(SIGSEGV); \
@@ -64,9 +64,9 @@ static void ws_ctube_ref_count_destroy(struct ws_ctube_ref_count *ref_count)
 	} while (0);
 
 #define ws_ctube_ref_count_release(ptr, ref_count_member, release_routine) do { \
-		const int _ref_count_refc = __atomic_sub_fetch(&(ptr)->ref_count_member.refc, (int)1, __ATOMIC_SEQ_CST); \
-		if (_ref_count_refc <= 0) { \
-			if (ws_ctube_likely(_ref_count_refc == 0)) { \
+		const int _ws_ctube_ref_count_refc = __atomic_sub_fetch(&(ptr)->ref_count_member.refc, (int)1, __ATOMIC_SEQ_CST); \
+		if (_ws_ctube_ref_count_refc <= 0) { \
+			if (ws_ctube_likely(_ws_ctube_ref_count_refc == 0)) { \
 				release_routine(ptr); \
 			} else { \
 				raise(SIGSEGV); \
