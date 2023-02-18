@@ -5,7 +5,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  *
- * The contents of this file are copied from src/ by ./pkg.sh
+ * The contents of this file are copied from ./src by ./pkg.sh
  */
 
 #ifndef WS_CTUBE_H
@@ -14,13 +14,7 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/**
- * Copyright (c) 2023 Bryance Oyang
- *
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
- */
+
 
 #ifndef WS_CTUBE_INCLUDE_H
 #define WS_CTUBE_INCLUDE_H

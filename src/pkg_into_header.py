@@ -60,6 +60,9 @@ def pkg_from(src: TextIOWrapper) -> str:
 
     return out_code
 
+def rm_one_banner(ws_ctube_h: str):
+    return re.sub(r"/\*\*.*?\*/", "", ws_ctube_h, flags=re.DOTALL, count=1)
+
 def main():
     # main include
     with open("ws_ctube_include.h", "r") as f:
@@ -83,14 +86,14 @@ def main():
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  *
- * The contents of this file are copied from src/ by ./pkg.sh
+ * The contents of this file are copied from ./src by ./pkg.sh
  */
 
 """)
         hfile.write("#ifndef WS_CTUBE_H\n#define WS_CTUBE_H\n")
         hfile.write("#ifdef __cplusplus\nextern \"C\" {\n#endif /* __cplusplus */\n\n")
 
-        hfile.write(ws_ctube_h)
+        hfile.write(rm_one_banner(ws_ctube_h))
         hfile.write(system_include_str())
         hfile.write(code)
 
