@@ -636,7 +636,15 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_siz
 	struct timespec cur_time;
 	const double max_bcast_fps = ctube->max_bcast_fps;
 	if (max_bcast_fps > 0) {
-		clock_gettime(CLOCK_MONOTONIC, &cur_time);
+
+#ifdef CLOCK_MONOTONIC
+		if (clock_gettime(CLOCK_MONOTONIC, &cur_time) != 0) {
+			clock_gettime(CLOCK_REALTIME, &cur_time);
+		}
+#else
+		clock_gettime(CLOCK_REALTIME, &cur_time);
+#endif /* CLOCK_MONOTONIC */
+
 		double dt = (cur_time.tv_sec - ctube->prev_bcast_time.tv_sec) +
 			1e-9 * (cur_time.tv_nsec - ctube->prev_bcast_time.tv_nsec);
 
