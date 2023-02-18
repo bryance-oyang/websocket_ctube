@@ -26,30 +26,36 @@
 #define PLANK_H 6.626e-34
 #define BOLTZMANN_K 1.38e-23
 
+/** CIE 1931 XYZ color space */
 struct color_XYZ {
 	double XYZ[3];
 };
 
+/** sRGB floating point */
 struct color_RGB {
 	double RGB[3];
 };
 
+/** sRGB (0-255) */
 struct color_RGB_8 {
 	uint8_t RGB[3];
 };
 
+/** wavelength to physical radiance */
 struct color_physical {
 	double *wavelen;
 	double *radiance;
 	size_t npoints;
 };
 
+/** precomputed sRGB colors for blackbody */
 struct blackbody_RGB_8_table {
 	int *temperatures;
 	struct color_RGB_8 *colors;
 	size_t npoints;
 };
 
+/** npoints of wavelength from 400-700nm */
 static inline int color_physical_init(struct color_physical *p, size_t npoints)
 {
 	double slope;
@@ -63,7 +69,6 @@ static inline int color_physical_init(struct color_physical *p, size_t npoints)
 	p->radiance = (typeof(p->radiance))malloc(npoints * sizeof(*p->radiance));
 	if (p->wavelen == NULL)
 		goto err_noradiance;
-
 
 	/* interpolate wavelen 400-700 nanometers */
 	slope = (700.0 - 400.0) / (npoints - 1);
@@ -126,9 +131,9 @@ static inline void RGB_to_uint8(const struct color_RGB *in, struct color_RGB_8 *
 static inline double color_piecewise_gauss(double x, double mu, double s1, double s2)
 {
 	if (x < mu) {
-		return expf(-(x - mu)*(x - mu) / (2*s1*s1));
+		return exp(-(x - mu)*(x - mu) / (2*s1*s1));
 	} else {
-		return expf(-(x - mu)*(x - mu) / (2*s2*s2));
+		return exp(-(x - mu)*(x - mu) / (2*s2*s2));
 	}
 }
 
