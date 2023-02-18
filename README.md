@@ -1,8 +1,10 @@
 # WebSocket Ctube
 `websocket_ctube` is a barebones, header-only library to enable a high
 performance C/C++ program to easily share its data with webpages while actively
-running (it implements a simple non-blocking WebSocket broadcast server). Modern
-web technology can then be harnessed to monitor or visualize data in real-time.
+running (it implements a simple non-blocking WebSocket broadcast server).
+
+Modern web technology can then be harnessed to monitor or visualize data in
+real-time.
 
 Initialize with `ws_ctube_open()` and call `ws_ctube_broadcast()` to send
 arbitrary data to all connected browsers via the WebSocket standard. The main
@@ -23,7 +25,8 @@ requirement imposed by the WebSocket standard)*
 The included demo solves the heat equation PDE in a C program and displays
 real-time simulation data in a browser HTML5 canvas.
 
-Demo additionally requires `make`, `python` (for http.server), and ports 9736, 9743. Run
+Demo additionally requires `make`, `python` (for http.server), and ports 9736,
+9743. Run
 ```shell
 ./demo.sh
 ```
@@ -114,9 +117,10 @@ int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t
 data_size);
 ```
 
-## Internal Architecture
-This section describes the internal workings of `websocket_ctube`. This is for
-documentation purposes only and is not needed to use the API.
+## Current Internal Architecture
+This section describes the internal workings of `websocket_ctube` as currently
+implemented. This is for documentation purposes only and is not needed to use
+the API. Improvements are always welcome.
 
 A picture is worth a thousand words:
 ![architecture_img](arch.png)
