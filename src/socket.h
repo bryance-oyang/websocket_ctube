@@ -14,24 +14,40 @@
 #define MSG_NOSIGNAL 0
 #endif
 
-static inline int ws_ctube_socket_send_all(const int fd, const char *buf, ssize_t len)
+/**
+ * send all characters in buf through a socket
+ *
+ * @param fd file descriptor
+ * @param buf buffer
+ * @param buf_size size of buffer in bytes
+ *
+ * @return 0 on success, -1 otherwise
+ */
+static inline int ws_ctube_socket_send_all(const int fd, const char *buf, ssize_t buf_size)
 {
-	while (len > 0) {
-		ssize_t nsent = send(fd, buf, len, MSG_NOSIGNAL);
+	while (buf_size > 0) {
+		ssize_t nsent = send(fd, buf, buf_size, MSG_NOSIGNAL);
 		if (nsent < 1) {
 			return -1;
 		}
 		buf += nsent;
-		len -= nsent;
+		buf_size -= nsent;
 	}
 
 	return 0;
 }
 
 /**
- * delim should be a null-terminated string or NULL
+ * receive all characters up to buf_size or when delim is encountered
+ *
+ * @param fd file descriptor
+ * @param buf buffer to read into
+ * @param buf_size size of buffer (including '\0' if delim is not NULL)
+ * @param delim should be a null-terminated string or NULL
  * if delim is NULL, receive up to buf_size bytes
  * if delim is not NULL, receive up to buf_size - 1 bytes or until delim is found
+ *
+ * @return 0 on success, -1 otherwise
  */
 static inline int ws_ctube_socket_recv_all(const int fd, char *const buf, const ssize_t buf_size, const char *delim)
 {

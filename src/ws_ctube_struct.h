@@ -7,6 +7,7 @@
 #include "ref_count.h"
 #include "list.h"
 
+/** holds data to be sent/received over the network */
 struct ws_ctube_data {
 	void *data;
 	size_t data_size;
@@ -54,6 +55,7 @@ static void ws_ctube_data_destroy(struct ws_ctube_data *ws_ctube_data)
 	ws_ctube_ref_count_destroy(&ws_ctube_data->refc);
 }
 
+/** copy data into ws_ctube_data */
 static inline int ws_ctube_data_cp(struct ws_ctube_data *ws_ctube_data, const void *data, size_t data_size)
 {
 	int retval = 0;
@@ -86,14 +88,18 @@ static void ws_ctube_data_free(struct ws_ctube_data *ws_ctube_data)
 	free(ws_ctube_data);
 }
 
+/** represents a client connection and owns their associated reader/writer threads */
 struct ws_ctube_conn_struct {
 	int fd;
 	struct ws_ctube *ctube;
 
+	/* to prevent double shutdown */
 	int stopping;
 	pthread_mutex_t stopping_mutex;
 
+	/** reader thread */
 	pthread_t reader_tid;
+	/** writer thread */
 	pthread_t writer_tid;
 
 	struct ws_ctube_ref_count refc;
@@ -141,6 +147,7 @@ enum ws_ctube_qaction {
 	WS_CTUBE_CONN_STOP
 };
 
+/** a work item in FIFO queue: start or stop a connection to client */
 struct ws_ctube_conn_qentry {
 	struct ws_ctube_conn_struct *conn;
 	enum ws_ctube_qaction act;
@@ -169,37 +176,47 @@ static void ws_ctube_conn_qentry_free(struct ws_ctube_conn_qentry *qentry)
 	free(qentry);
 }
 
+/** main struct for ws_ctube */
 struct ws_ctube {
 	int server_sock;
 	int port;
 	int max_nclient;
 
+	/* to have timeout on operations */
 	struct timespec timeout_spec;
 	struct timeval timeout_val;
 
+	/* currently unused (for incoming data) */
 	struct ws_ctube_list in_data_list;
 	int in_data_pred;
 	pthread_mutex_t in_data_mutex;
 	pthread_cond_t in_data_cond;
 
+	/* current ws_ctube_data representing data to be sent */
 	struct ws_ctube_data *out_data;
 	unsigned long out_data_id;
 	pthread_mutex_t out_data_mutex;
 	pthread_cond_t out_data_cond;
 
+	/* rate-limit broadcasting */
 	double max_bcast_fps;
 	struct timespec prev_bcast_time;
 
+	/* the FIFO work queue: connection handler starts/stops client
+	 * connections based on queued actions */
 	struct ws_ctube_list connq;
 	int connq_pred;
 	pthread_mutex_t connq_mutex;
 	pthread_cond_t connq_cond;
 
+	/* allows ws_ctube_open() to know if server successfully started or not */
 	int server_inited;
 	pthread_mutex_t server_init_mutex;
 	pthread_cond_t server_init_cond;
 
+	/** connection handler thread */
 	pthread_t handler_tid;
+	/** server thread */
 	pthread_t server_tid;
 };
 

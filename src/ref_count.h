@@ -1,6 +1,13 @@
 /**
  * @file
  * @brief thread-safe reference counting
+ *
+ * initialized with a ref count of 0
+ *
+ * acquire with ws_ctube_ref_count_acquire
+ *
+ * release with ws_ctube_ref_count_release and provide the routine that can free
+ * the object if the ref count goes to 0
  */
 
 #ifndef WS_CTUBE_REF_COUNT_H
@@ -9,6 +16,7 @@
 #include <pthread.h>
 #include <signal.h>
 
+/** including this in a larger struct allows it to be reference counted */
 struct ws_ctube_ref_count {
 	volatile int refc;
 };

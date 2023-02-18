@@ -4,9 +4,10 @@ performance C/C++ program to easily share its data with webpages while actively
 running (it implements a simple non-blocking WebSocket broadcast server). Modern
 web technology can then be harnessed to monitor or visualize data in real-time.
 
-Call `ws_ctube_broadcast()` to send arbitrary data to all connected browsers via
-the WebSocket standard.  The main C/C++ program thread can continue to run while
-the network operations are handled by `websocket_ctube` in separate threads.
+Just call `ws_ctube_broadcast()` to send arbitrary data to all connected
+browsers via the WebSocket standard.  The main C/C++ program thread can continue
+to run while the network operations are handled by `websocket_ctube` in separate
+threads.
 
 Simply include `ws_ctube.h` in your project and compile with `-pthread`.
 
@@ -22,7 +23,7 @@ requirement imposed by the WebSocket standard)*
 The included demo solves the heat equation PDE in a C program and displays
 real-time simulation data in a browser HTML5 canvas.
 
-Demo additionally requires `make`, `python`, and ports 9736, 9743. Run
+Demo additionally requires `make`, `python` (for http.server), and ports 9736, 9743. Run
 ```shell
 ./demo.sh
 ```

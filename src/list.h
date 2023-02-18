@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include "container_of.h"
 
+/** including this in a larger struct allows it to be a part of a list */
 struct ws_ctube_list_node {
 	struct ws_ctube_list_node *prev;
 	struct ws_ctube_list_node *next;
@@ -31,6 +32,7 @@ static void ws_ctube_list_node_destroy(struct ws_ctube_list_node *node)
 	pthread_mutex_destroy(&node->mutex);
 }
 
+/** thread-safe circular doubly-linked list */
 struct ws_ctube_list {
 	struct ws_ctube_list_node head;
 	int len;
