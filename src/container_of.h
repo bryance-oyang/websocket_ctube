@@ -14,7 +14,7 @@
  * struct a *a_ptr;
  * struct c *c_ptr = &a_ptr->cmember;
  *
- * a_ptr == ws_ctube_container_of(c_ptr, struct a, cmember) // true
+ * assert(a_ptr == ws_ctube_container_of(c_ptr, struct a, cmember))
  */
 #define ws_ctube_container_of(ptr, type, member) ({ \
 	typeof(((type *)0)->member) *_ws_ctube_container_of_ptr = (ptr); \
