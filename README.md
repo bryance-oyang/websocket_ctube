@@ -122,6 +122,9 @@ This section describes the internal workings of `websocket_ctube` as currently
 implemented. This is for documentation purposes only and is not needed to use
 the API. Improvements are always welcome.
 
+Source code for `websocket_ctube` is in `src/` and is copied into the single
+header file `ws_ctube.h` for release by `./pkg.sh`
+
 A picture is worth a thousand words:
 ![architecture_img](arch.png)
 
