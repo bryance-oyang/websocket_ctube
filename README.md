@@ -62,6 +62,8 @@ websocket.onmessage = (event) => {
 	// etc...
 }
 ```
+Note that raw C/C++ data is transmitted (as if memcpy'ed to the browser) so set
+the endianness for the `DataView` accordingly.
 
 *TLS/SSL is not yet supported so the browser webpage trying to connect to
 `websocket_ctube` cannot be served with https for now (this is a security
