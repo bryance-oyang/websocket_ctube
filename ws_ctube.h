@@ -21,8 +21,8 @@ extern "C" {
 
 
 
-#ifndef WS_CTUBE_INCLUDE_H
-#define WS_CTUBE_INCLUDE_H
+#ifndef WS_CTUBE_API_H
+#define WS_CTUBE_API_H
 
 #include <stddef.h>
 
@@ -61,9 +61,8 @@ void ws_ctube_close(struct ws_ctube *ctube);
  * network operations will be handled internally and opaquely by separate
  * threads.
  *
- * Though non-blocking, system calls performed by this function can potentially
- * take tens of microseconds. Try not to unnecessarily call this function in
- * tight loops.
+ * Though non-blocking, try not to unnecessarily call this function in
+ * performance-critical loops.
  *
  * If other threads can write to *data, get a read-lock to protect *data before
  * broadcasting. The read-lock can be released immediately once this function
@@ -77,7 +76,7 @@ void ws_ctube_close(struct ws_ctube *ctube);
  */
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size);
 
-#endif /* WS_CTUBE_INCLUDE_H */
+#endif /* WS_CTUBE_API_H */
 #include <pthread.h>
 #include <signal.h>
 #include <stddef.h>
