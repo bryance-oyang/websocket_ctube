@@ -63,7 +63,10 @@ websocket.onmessage = (event) => {
 }
 ```
 Note that raw C/C++ data is transmitted (as if memcpy'ed to the browser) so set
-the endianness for the `DataView` accordingly.
+the endianness for the `DataView` accordingly (e.g. x86 is little endian).
+
+There are many free interactive JavaScript visualization tools for viewing data
+(e.g. threejs for 3D or plotly for plotting to name a few).
 
 *TLS/SSL is not yet supported so the browser webpage trying to connect to
 `websocket_ctube` cannot be served with https for now (this is a security
