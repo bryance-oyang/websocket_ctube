@@ -58,7 +58,7 @@ websocket.onmessage = (event) => {
 	// get data transmitted by the C/C++ program
 	const data = new DataView(event.data)
 	// use data...
-	let x = data.getInt32(i, endianness);
+	let x = data.getInt32(i, littleEndian);
 	// etc...
 }
 ```
