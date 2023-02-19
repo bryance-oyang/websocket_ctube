@@ -97,10 +97,12 @@ thread calls `ws_ctube_broadcast()`, a `ws_ctube_data` is created and data is
 memcpy'ed into it. The main thread then wakes the writers. At this point,
 `ws_ctube_broadcast()` returns and the main thread can continue.
 
-When writers wake, they acquire references to the current `ws_ctube_data` and
-send the data to their clients via data frames according to the WebSocket
-standard. Having one writer per client means that clients cannot block each
-other.
+When writers wake, they acquire references to the current (shared memory)
+`ws_ctube_data` and send the data to their clients via data frames according to
+the WebSocket standard. Having one writer per client means that clients cannot
+block each other. Writers having references to `ws_ctube_data` means that a
+slow writer can hold onto and finish sending a `ws_ctube_data` even when
+newer ones are created by `ws_ctube_broadcast()`.
 
 `ws_ctube_close()` cancels the threads and frees associated resources.
 Cancelling the connection handler thread causes cancellation of all
