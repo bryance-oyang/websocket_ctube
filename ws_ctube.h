@@ -26,6 +26,10 @@ extern "C" {
 
 #include <stddef.h>
 
+#ifndef typeof
+#define typeof __typeof__
+#endif
+
 struct ws_ctube;
 
 /**
