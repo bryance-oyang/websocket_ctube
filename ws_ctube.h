@@ -1871,6 +1871,12 @@ out_noalloc:
 
 void ws_ctube_close(struct ws_ctube *ctube)
 {
+	if (ws_ctube_unlikely(ctube == NULL)) {
+		fprintf(stderr, "ws_ctube_close(): error: ctube is NULL\n");
+		fflush(stderr);
+		return;
+	}
+
 	ws_ctube_stop(ctube);
 	ws_ctube_destroy(ctube);
 	free(ctube);
@@ -1878,8 +1884,20 @@ void ws_ctube_close(struct ws_ctube *ctube)
 
 int ws_ctube_broadcast(struct ws_ctube *ctube, const void *data, size_t data_size)
 {
+	if (ws_ctube_unlikely(ctube == NULL)) {
+		fprintf(stderr, "ws_ctube_broadcast(): error: ctube is NULL\n");
+		fflush(stderr);
+		return -1;
+	}
+	if (ws_ctube_unlikely(data == NULL)) {
+		fprintf(stderr, "ws_ctube_broadcast(): error: data is NULL\n");
+		fflush(stderr);
+		return -1;
+	}
 	if (ws_ctube_unlikely(data_size == 0)) {
-		return 0;
+		fprintf(stderr, "ws_ctube_broadcast(): error: data_size is 0\n");
+		fflush(stderr);
+		return -1;
 	}
 
 	int retval = 0;
