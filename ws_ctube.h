@@ -1479,6 +1479,8 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 		qentry = ws_ctube_container_of(node, typeof(*qentry), lnode);
 		conn = qentry->conn;
 
+		pthread_cleanup_push((cleanup_func)ws_ctube_conn_qentry_free, qentry);
+
 		switch (qentry->act) {
 		case WS_CTUBE_CONN_START:
 			pthread_mutex_lock(&conn_list->mutex);
@@ -1515,7 +1517,7 @@ static void ws_ctube_handler_process_queue(struct ws_ctube_list *connq, struct w
 			break;
 		}
 
-		ws_ctube_conn_qentry_free(qentry);
+		pthread_cleanup_pop(1); /* ws_ctube_conn_qentry_free */
 	}
 }
 
